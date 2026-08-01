@@ -102,7 +102,7 @@ export default function CampaignsPage() {
       });
 
       // 2. Target the selected employees
-      await api.recipients.add(created.id || created._id,
+      await api.recipients.add(created.id,
         targetEmployees.map((e) => ({ email: e.email, name: e.name }))
       );
 

@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils"
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "success"
-  size?: "sm" | "md" | "lg"
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "destructive" | "success"
+  size?: "sm" | "md" | "lg" | "icon"
   loading?: boolean
 }
 
@@ -21,14 +21,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       secondary: "bg-secondary text-secondary-foreground hover:bg-slate-100 border border-border shadow-sm",
       outline: "bg-transparent border border-border text-foreground hover:bg-secondary",
       ghost: "bg-transparent text-foreground hover:bg-secondary",
-      danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
+      destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
       success: "bg-success text-success-foreground hover:bg-success/90 shadow-sm"
     }
 
     const sizes = {
       sm: "h-8 px-3 text-xs",
       md: "h-10 px-4 py-2 text-sm",
-      lg: "h-11 px-8 text-base"
+      lg: "h-11 px-8 text-base",
+      icon: "h-10 w-10 p-0"
     }
 
     return (
