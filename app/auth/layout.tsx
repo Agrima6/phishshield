@@ -21,7 +21,7 @@ export default function AuthLayout({
               P
             </div>
             <span className="font-semibold text-lg tracking-wider text-slate-100">
-              PHISHDASH <span className="text-amber-500 font-bold">ENTERPRISE</span>
+              PHISHSHIELD <span className="text-amber-500 font-bold">ENTERPRISE</span>
             </span>
           </div>
         </div>
@@ -53,7 +53,7 @@ export default function AuthLayout({
         </div>
 
         <div className="relative z-10 border-t border-slate-800 pt-6 flex items-center justify-between text-xs text-slate-400">
-          <span>© 2026 PhishDash. All rights reserved.</span>
+          <span>© 2026 PhishShield. All rights reserved.</span>
           <div className="flex items-center gap-1">
             <Award className="h-4 w-4 text-amber-500" />
             <span>Secure SaaS Platform</span>

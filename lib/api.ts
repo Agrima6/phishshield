@@ -22,6 +22,7 @@ async function fetcher<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${url}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -110,29 +111,31 @@ export function mapBackendToCampaign(backend: any): Campaign {
 
 export const api = {
   auth: {
-    login: async (username: string, password: string) => {
+    // Exchanges a verified Clerk session token for the Flask session that
+    // _get_session_info() in app.py actually checks on every later request.
+    establishSession: async (clerkToken: string) => {
       const res = await fetcher<{
-        token: string;
+        id: string;
+        name: string;
+        email: string;
         role: string;
-        label: string;
-        username: string;
-        tenant_id: string;
-        tenant_name: string;
-      }>('/api/phish/auth/login', {
+      }>('/api/auth/clerk/session', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        headers: { Authorization: `Bearer ${clerkToken}` },
       });
-      
-      localStorage.setItem('phish_session_token', res.token);
-      localStorage.setItem('phish_username', res.username);
+
+      // _get_session_info() only accepts the literal string "clerk" here — the
+      // real credential is the Flask session cookie set by the call above.
+      localStorage.setItem('phish_session_token', 'clerk');
+      localStorage.setItem('phish_username', res.email || res.name);
       localStorage.setItem('phish_role', res.role);
-      localStorage.setItem('phish_tenant', res.tenant_id);
-      localStorage.setItem('phish_tenant_name', res.tenant_name);
-      
+      localStorage.setItem('phish_tenant', 'default');
+      localStorage.setItem('phish_tenant_name', 'Default Tenant');
+
       return res;
     },
     logout: async () => {
-      await fetcher('/api/phish/auth/logout', { method: 'POST' }).catch(() => {});
+      await fetcher('/api/auth/clerk/logout', { method: 'POST' }).catch(() => {});
       localStorage.removeItem('phish_session_token');
       localStorage.removeItem('phish_username');
       localStorage.removeItem('phish_role');
@@ -150,6 +153,15 @@ export const api = {
     },
   },
   
+  analytics: {
+    overview: async () => {
+      return fetcher<{
+        department_rates: { department: string; rate: number; total_recipients: number }[];
+        recent_events: { name: string; campaign: string; status: string; timestamp: string }[];
+      }>('/api/phish/analytics/overview');
+    },
+  },
+
   settings: {
     get: async () => {
       const res = await fetcher<any>('/api/tenant/settings');

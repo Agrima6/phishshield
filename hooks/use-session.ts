@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useClerk } from '@clerk/nextjs';
 import { api } from '@/lib/api';
 
 export function useSession() {
+  const clerk = useClerk();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
   const [role, setRole] = useState<string>('admin');
@@ -79,6 +81,14 @@ export function useSession() {
   const logout = async () => {
     try {
       await api.auth.logout();
+    } catch {
+      // ignore
+    }
+    try {
+      // Must end the Clerk-level session too — otherwise /auth/login's
+      // auto-restore (needed for single-session-mode) immediately re-signs
+      // you back in the instant you land there, making logout a no-op.
+      await clerk.signOut();
     } catch {
       // ignore
     }

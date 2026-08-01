@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { KeyRound, Mail, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { KeyRound, Mail, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useAuth, useClerk } from '@clerk/nextjs';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,10 +23,13 @@ type LoginFormValues = zod.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useSession();
+  const clerk = useClerk();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [passwordValue, setPasswordValue] = useState('');
-  const [ssoLoading, setSsoLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const {
     register,
@@ -34,7 +38,7 @@ export default function LoginPage() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@provana.com',
+      email: '',
       password: '',
     },
   });
@@ -52,45 +56,91 @@ export default function LoginPage() {
 
   const strengthScore = getPasswordStrength(passwordValue);
 
+  // Hands a Clerk session token to the Flask backend so it can mint the
+  // session cookie /api/phish/* routes check, then enters the console.
+  const completeSignIn = async () => {
+    const token = await getToken();
+    if (!token) {
+      throw new Error('Could not obtain a session token from Clerk.');
+    }
+    const session = await api.auth.establishSession(token);
+    login('clerk', session.email, session.role, 'default', 'Default Tenant');
+    router.push('/dashboard');
+  };
+
+  // This Clerk instance is single-session: if the browser already has an
+  // active Clerk session (e.g. from an earlier sign-in attempt), starting a
+  // new one throws "Session already exists" instead of just letting it
+  // through. So on load, if we're already signed in at the Clerk level, skip
+  // straight to establishing our own app session rather than showing the form.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    setRestoring(true);
+    completeSignIn().catch((err: any) => {
+      toast.error(err?.errors?.[0]?.message || err.message || 'Failed to restore your session.');
+      setRestoring(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn]);
+
   const onSubmit = async (data: LoginFormValues) => {
+    if (!isLoaded) {
+      toast.error('Still connecting to the authentication service — please try again in a moment.');
+      return;
+    }
     setLoading(true);
     try {
-      // 1. Submit email and password to Flask auth login endpoint
-      const res = await api.auth.login(data.email, data.password);
-      
-      // 2. Credentials verified, temporarily store for the OTP step
-      localStorage.setItem('temp_login_email', data.email);
-      localStorage.setItem('temp_session_token', res.token);
-      localStorage.setItem('temp_session_role', res.role);
-      localStorage.setItem('temp_session_tenant', res.tenant_id);
-      localStorage.setItem('temp_session_tenant_name', res.tenant_name);
+      // 1. Authenticate against Clerk directly (this Clerk instance requires a password first factor)
+      const result = await clerk.client.signIn.create({
+        identifier: data.email,
+        password: data.password,
+      });
 
-      toast.success('Credentials verified. Proceeding to OTP authentication.');
-      router.push('/auth/otp');
+      if (result.status !== 'complete') {
+        toast.error('Additional verification is required for this account, which this console does not yet support.');
+        return;
+      }
+
+      // 2. Activate the Clerk session client-side, then finish via the shared helper.
+      await clerk.setActive({ session: result.createdSessionId });
+      await completeSignIn();
+      toast.success('Signed in successfully.');
     } catch (err: any) {
-      toast.error(err.message || 'Invalid corporate email or password.');
+      const message = err?.errors?.[0]?.message || err.message || 'Invalid corporate email or password.';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSSOLogin = () => {
-    setSsoLoading(true);
-    
-    // Resolve tenant from the email input field to initiate tenant-specific SSO
-    const emailInput = (document.querySelector('input[type="email"]') as HTMLInputElement)?.value || '';
-    let tenantId = 'provana';
-    if (emailInput.includes('@hero.')) {
-      tenantId = 'hero';
-    } else if (emailInput.includes('@default.')) {
-      tenantId = 'default';
+  const handleGoogleSignIn = async () => {
+    if (!isLoaded) {
+      toast.error('Still connecting to the authentication service — please try again in a moment.');
+      return;
     }
-    
-    toast.loading('Redirecting to Microsoft Entra ID SSO...');
-    
-    // Redirect browser to flask backend auth OIDC login endpoint
-    window.location.href = `http://localhost:8000/api/auth/sso/login?tenant=${tenantId}`;
+    setGoogleLoading(true);
+    try {
+      // Full-page redirect to Google; the browser navigates away from here.
+      await clerk.client.signIn.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: `${window.location.origin}/auth/sso-callback`,
+        redirectUrlComplete: `${window.location.origin}/dashboard`,
+      });
+    } catch (err: any) {
+      const message = err?.errors?.[0]?.message || err.message || 'Google sign-in failed.';
+      toast.error(message);
+      setGoogleLoading(false);
+    }
   };
+
+  if (restoring) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-12">
+        <RefreshCw className="h-6 w-6 text-primary animate-spin" />
+        <span className="text-sm font-medium text-slate-600">Restoring your session...</span>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -189,7 +239,7 @@ export default function LoginPage() {
 
         <div className="flex items-center justify-end text-xs">
           <a
-            href="/forgot-password"
+            href="/auth/forgot-password"
             className="text-primary hover:text-primary-hover font-semibold transition-colors"
           >
             Forgot your password?
@@ -202,7 +252,6 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      {/* SSO Divider */}
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-slate-200" />
@@ -212,22 +261,28 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Microsoft SSO OIDC Button */}
       <Button
         type="button"
         variant="outline"
-        onClick={handleSSOLogin}
+        onClick={handleGoogleSignIn}
         className="w-full flex items-center justify-center gap-2"
-        loading={ssoLoading}
+        loading={googleLoading}
       >
-        <svg className="h-4 w-4 shrink-0" viewBox="0 0 23 23">
-          <path fill="#f35325" d="M1 1h10v10H1z" />
-          <path fill="#81bc06" d="M12 1h10v10H12z" />
-          <path fill="#05a6f0" d="M1 12h10v10H1z" />
-          <path fill="#ffba08" d="M12 12h10v10H12z" />
+        <svg className="h-4 w-4 shrink-0" viewBox="0 0 48 48">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6 29.6 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z" />
+          <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.3 35.1 26.8 36 24 36c-5.3 0-9.6-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 2.8-2.8 5.1-5.1 6.6l6.3 5.3C39.9 37.1 44 31.5 44 24c0-1.3-.1-2.7-.4-3.5z" />
         </svg>
-        Microsoft Entra ID SSO
+        Sign in with Google
       </Button>
+
+      <p className="text-xs text-center text-slate-500 mt-6">
+        Don&apos;t have an account?{' '}
+        <a href="/auth/sign-up" className="text-primary hover:text-primary-hover font-semibold transition-colors">
+          Sign up
+        </a>
+      </p>
     </div>
   );
 }

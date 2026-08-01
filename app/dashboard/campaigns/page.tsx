@@ -47,17 +47,23 @@ export default function CampaignsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
 
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [camps, tenantSettings, templatesList] = await Promise.all([
+      const [camps, tenantSettings, templatesList, employeesList] = await Promise.all([
         api.campaigns.list(),
         api.settings.get(),
-        api.templates.list()
+        api.templates.list(),
+        api.employees.list()
       ]);
       setCampaigns(camps);
       setSettings(tenantSettings);
       setTemplates(templatesList);
+      setEmployees(employeesList);
+      setSelectedEmployeeIds(employeesList.map((e: any) => e._id || e.id));
     } catch (err: any) {
       toast.error('Failed to connect to backend: ' + err.message);
     } finally {
@@ -78,6 +84,12 @@ export default function CampaignsPage() {
     const chosenTemplate = templates.find(t => (t._id || t.id) === newCampaign.templateId);
     const bodyHtml = chosenTemplate ? chosenTemplate.body : '<p>Account verification required.</p>';
 
+    const targetEmployees = employees.filter((e) => selectedEmployeeIds.includes(e._id || e.id));
+    if (targetEmployees.length === 0) {
+      toast.error('Select at least one employee to target.');
+      return;
+    }
+
     try {
       // 1. Create campaign in Flask backend
       const created = await api.campaigns.create({
@@ -89,11 +101,10 @@ export default function CampaignsPage() {
         email_config_id: newCampaign.emailConfigId || undefined
       });
 
-      // 2. Add sample recipients for testing
-      await api.recipients.add(created.id || created._id, [
-        { email: 'admin@provana.com', name: 'Admin User' },
-        { email: 'alert@hero.localhost', name: 'Test Target' }
-      ]);
+      // 2. Target the selected employees
+      await api.recipients.add(created.id || created._id,
+        targetEmployees.map((e) => ({ email: e.email, name: e.name }))
+      );
 
       toast.success(`Simulation campaign "${created.name}" created as draft.`);
       setWizardOpen(false);
@@ -109,6 +120,12 @@ export default function CampaignsPage() {
     } catch (err: any) {
       toast.error('Failed to build simulation run: ' + err.message);
     }
+  };
+
+  const toggleEmployeeSelected = (id: string) => {
+    setSelectedEmployeeIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   const handleLaunchCampaign = async (id: string, name: string) => {
@@ -262,7 +279,7 @@ export default function CampaignsPage() {
       <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Deploy Simulation Wizard (Step {wizardStep} of 3)</DialogTitle>
+            <DialogTitle>Deploy Simulation Wizard (Step {wizardStep} of 4)</DialogTitle>
             <DialogDescription>
               Deploy mock security audit payloads to track organizational vigilance.
             </DialogDescription>
@@ -303,8 +320,66 @@ export default function CampaignsPage() {
             </div>
           )}
 
-          {/* Wizard Step 2: Choose Template */}
+          {/* Wizard Step 2: Select Audience */}
           {wizardStep === 2 && (
+            <div className="py-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-slate-700">Target Employees</label>
+                <button
+                  type="button"
+                  className="text-[10px] font-semibold text-primary hover:underline"
+                  onClick={() =>
+                    setSelectedEmployeeIds(
+                      selectedEmployeeIds.length === employees.length
+                        ? []
+                        : employees.map((e) => e._id || e.id)
+                    )
+                  }
+                >
+                  {selectedEmployeeIds.length === employees.length ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
+              {employees.length === 0 ? (
+                <p className="text-xs text-slate-400 py-6 text-center">
+                  No employees in the directory yet. Add employees before creating a campaign.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {employees.map((emp) => {
+                    const empId = emp._id || emp.id;
+                    const checked = selectedEmployeeIds.includes(empId);
+                    return (
+                      <div
+                        key={empId}
+                        onClick={() => toggleEmployeeSelected(empId)}
+                        className={`p-3 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${
+                          checked ? 'border-primary bg-amber-50/20' : 'border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div>
+                          <h4 className="font-semibold text-xs text-slate-900">{emp.name}</h4>
+                          <p className="text-[10px] text-slate-500">{emp.email}</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleEmployeeSelected(empId)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 accent-primary"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-[10px] text-slate-400 font-normal mt-2 leading-relaxed">
+                {selectedEmployeeIds.length} of {employees.length} employee(s) selected.
+              </p>
+            </div>
+          )}
+
+          {/* Wizard Step 3: Choose Template */}
+          {wizardStep === 3 && (
             <div className="space-y-3 py-4 max-h-60 overflow-y-auto">
               {templates.map((temp) => {
                 const tempId = temp._id || temp.id;
@@ -334,8 +409,8 @@ export default function CampaignsPage() {
             </div>
           )}
 
-          {/* Wizard Step 3: Sender Configuration */}
-          {wizardStep === 3 && (
+          {/* Wizard Step 4: Sender Configuration */}
+          {wizardStep === 4 && (
             <div className="space-y-4 py-4 text-xs font-semibold">
               <div>
                 <label className="block text-slate-700 mb-1">Select Outgoing SMTP / SendGrid Profile</label>
@@ -343,7 +418,7 @@ export default function CampaignsPage() {
                   value={newCampaign.emailConfigId}
                   onChange={(e) => setNewCampaign({ ...newCampaign, emailConfigId: e.target.value })}
                 >
-                  <option value="">Default System gateway (PhishDash Shared SMTP)</option>
+                  <option value="">Default System gateway (PhishShield Shared SMTP)</option>
                   {settings?.emailConfigs.map((cfg: any) => (
                     <option key={cfg.id} value={cfg.id}>
                       {cfg.name} ({cfg.provider === 'smtp' ? 'SMTP' : 'SendGrid'}) — {cfg.fromEmail}
@@ -369,8 +444,12 @@ export default function CampaignsPage() {
               <Button variant="ghost" size="sm" onClick={() => setWizardOpen(false)}>
                 Cancel
               </Button>
-              {wizardStep < 3 ? (
-                <Button size="sm" onClick={() => setWizardStep(wizardStep + 1)}>
+              {wizardStep < 4 ? (
+                <Button
+                  size="sm"
+                  onClick={() => setWizardStep(wizardStep + 1)}
+                  disabled={wizardStep === 2 && selectedEmployeeIds.length === 0}
+                >
                   Next
                 </Button>
               ) : (

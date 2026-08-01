@@ -32,6 +32,20 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
+// Tailwind v4's utilities (bg-primary, text-primary, ...) read --color-primary
+// at runtime, so overriding it on the root element re-themes the whole app
+// without a rebuild.
+function darkenHex(hex: string, amount = 0.15): string {
+  const clean = hex.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return hex;
+  const num = parseInt(clean, 16);
+  const channel = (shift: number) =>
+    Math.max(0, Math.floor(((num >> shift) & 0xff) * (1 - amount)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(16)}${channel(8)}${channel(0)}`;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -80,6 +94,32 @@ export default function DashboardLayout({
       router.push('/auth/login');
     }
   }, [isLoggedIn, loading, router]);
+
+  // Verify the stored session is still valid against the backend, rather than
+  // trusting localStorage alone — a stale/fake token would otherwise render
+  // this dashboard shell while every data call underneath silently 401s.
+  useEffect(() => {
+    if (loading || !isLoggedIn) return;
+    api.auth.me().catch(() => {
+      logout();
+    });
+  }, [isLoggedIn, loading]);
+
+  // Apply the tenant's branding accent color across the dashboard.
+  useEffect(() => {
+    if (loading || !isLoggedIn) return;
+    api.settings.get()
+      .then((settings) => {
+        const color = settings.branding?.primaryColor;
+        if (color) {
+          document.documentElement.style.setProperty('--color-primary', color);
+          document.documentElement.style.setProperty('--color-primary-hover', darkenHex(color));
+        }
+      })
+      .catch(() => {
+        // Tenant settings unreachable — keep the default theme.
+      });
+  }, [isLoggedIn, loading]);
 
   // Command palette listener (⌘K or Ctrl+K)
   useEffect(() => {
@@ -198,7 +238,7 @@ export default function DashboardLayout({
               </div>
               {sidebarOpen && (
                 <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
-                  PHISHDASH <span className="text-amber-600">ENT</span>
+                  PHISHSHIELD <span className="text-amber-600">ENT</span>
                 </span>
               )}
             </div>

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PhishDash Enterprise - Security Awareness SaaS Portal",
+  title: "PhishShield Enterprise - Security Awareness SaaS Portal",
   description: "Enterprise multi-tenant phishing simulation and employee training dashboard.",
 };
 

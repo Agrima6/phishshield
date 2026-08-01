@@ -19,20 +19,39 @@ import { api } from '@/lib/api';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
+function timeAgo(isoTimestamp: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(isoTimestamp).getTime()) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
 export default function OverviewPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [departmentRates, setDepartmentRates] = useState<{ department: string; rate: number; total_recipients: number }[]>([]);
+  const [recentEvents, setRecentEvents] = useState<{ name: string; campaign: string; status: string; timestamp: string }[]>([]);
+  const [ssoEnabled, setSsoEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [camps, emps] = await Promise.all([
+      const [camps, emps, analytics, settings] = await Promise.all([
         api.campaigns.list(),
-        api.employees.list()
+        api.employees.list(),
+        api.analytics.overview(),
+        api.settings.get(),
       ]);
       setCampaigns(camps);
       setEmployees(emps);
+      setDepartmentRates(analytics.department_rates);
+      setRecentEvents(analytics.recent_events);
+      setSsoEnabled(settings.sso.enabled);
     } catch (err: any) {
       toast.error('Failed to fetch dashboard metrics: ' + err.message);
     } finally {
@@ -70,7 +89,7 @@ export default function OverviewPage() {
           <Button variant="outline" size="sm" onClick={loadData}>
             Refresh telemetry
           </Button>
-          <Link href="/dashboard/campaigns" passHref legacyBehavior>
+          <Link href="/dashboard/campaigns">
             <Button size="sm">
               New Simulation
             </Button>
@@ -166,27 +185,31 @@ export default function OverviewPage() {
               <CardDescription>Average link click rates across active departments</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4 pt-2">
-                {[
-                  { dept: 'Sales & BD', rate: 18, color: 'bg-red-500' },
-                  { dept: 'Human Resources', rate: 12, color: 'bg-orange-500' },
-                  { dept: 'Finance & Legal', rate: 5, color: 'bg-amber-500' },
-                  { dept: 'Engineering', rate: 2, color: 'bg-green-500' }
-                ].map((item) => (
-                  <div key={item.dept} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-600">{item.dept}</span>
-                      <span className="text-slate-900">{item.rate}% clicks</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-500 ${item.color}`}
-                        style={{ width: `${item.rate * 5}%` }} 
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {departmentRates.length === 0 ? (
+                <p className="text-xs text-slate-400 py-6 text-center">
+                  No department click-rate data yet — this fills in once employees with a department have appeared in a sent campaign.
+                </p>
+              ) : (
+                <div className="space-y-4 pt-2">
+                  {departmentRates.map((item) => {
+                    const color = item.rate >= 15 ? 'bg-red-500' : item.rate >= 8 ? 'bg-orange-500' : item.rate >= 3 ? 'bg-amber-500' : 'bg-green-500';
+                    return (
+                      <div key={item.department} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-slate-600">{item.department}</span>
+                          <span className="text-slate-900">{item.rate}% clicks</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${color}`}
+                            style={{ width: `${Math.min(item.rate, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -257,13 +280,15 @@ export default function OverviewPage() {
               <CardDescription>Compliance verification checklist</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start gap-3 p-3 bg-green-50/50 border border-green-200 rounded-lg">
-                <ShieldCheck className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-xs text-green-900">Microsoft Entra OIDC Active</h4>
-                  <p className="text-[10px] text-green-700 mt-0.5">SSO single sign-on is fully active for administration login.</p>
+              {ssoEnabled && (
+                <div className="flex items-start gap-3 p-3 bg-green-50/50 border border-green-200 rounded-lg">
+                  <ShieldCheck className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-xs text-green-900">Microsoft Entra OIDC Active</h4>
+                    <p className="text-[10px] text-green-700 mt-0.5">SSO single sign-on is fully active for administration login.</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-start gap-3 p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
@@ -281,24 +306,26 @@ export default function OverviewPage() {
               <CardDescription>Latest simulated payload triggers</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                { name: 'Jane Doe', time: '10 mins ago', camp: 'Q2 Phishing Assessment', status: 'Clicked Link' },
-                { name: 'Michael Chang', time: '2 hours ago', camp: 'Q2 Phishing Assessment', status: 'Opened Email' },
-                { name: 'Alice Johnson', time: '1 day ago', camp: 'New Year Bonus Harvester', status: 'Reported Email' }
-              ].map((log, idx) => (
-                <div key={idx} className="flex justify-between items-start border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
-                  <div>
-                    <span className="font-semibold text-slate-800">{log.name}</span>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{log.camp}</p>
+              {recentEvents.length === 0 ? (
+                <p className="text-xs text-slate-400 py-6 text-center">
+                  No opens or clicks recorded yet — this fills in once recipients interact with a sent campaign.
+                </p>
+              ) : (
+                recentEvents.map((log, idx) => (
+                  <div key={idx} className="flex justify-between items-start border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
+                    <div>
+                      <span className="font-semibold text-slate-800">{log.name}</span>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{log.campaign}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`font-semibold ${
+                        log.status === 'Clicked Link' ? 'text-destructive' : 'text-amber-600'
+                      }`}>{log.status}</span>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(log.timestamp)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`font-semibold ${
-                      log.status === 'Clicked Link' ? 'text-destructive' : log.status === 'Opened Email' ? 'text-amber-600' : 'text-green-600'
-                    }`}>{log.status}</span>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{log.time}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

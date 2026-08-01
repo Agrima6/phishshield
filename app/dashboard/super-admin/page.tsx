@@ -96,7 +96,7 @@ export default function SuperAdminPage() {
         <ShieldAlert className="h-16 w-16 text-destructive animate-pulse" />
         <h2 className="text-xl font-bold text-slate-800 font-sans">Access Restricted</h2>
         <p className="text-sm max-w-md text-center">
-          Only the Super Administrator of the PhishDash SaaS Platform is authorized to access the onboarded tenant directory.
+          Only the Super Administrator of the PhishShield SaaS Platform is authorized to access the onboarded tenant directory.
         </p>
       </div>
     );
