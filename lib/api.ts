@@ -19,7 +19,9 @@ async function fetcher<T>(url: string, options: RequestInit = {}): Promise<T> {
     headers.set('X-Switch-Tenant', activeTenant);
   }
 
-  const response = await fetch(`${API_BASE}${url}`, {
+  // Relative path (not API_BASE) so this goes through the same-origin
+  // rewrite proxy in next.config.ts, keeping the session cookie same-site.
+  const response = await fetch(url, {
     ...options,
     headers,
     credentials: 'include',
