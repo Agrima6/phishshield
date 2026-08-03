@@ -167,6 +167,18 @@ export default function TemplatesPage() {
     setPreviewOpen(true);
   };
 
+  // Fills in the same placeholders the real send pipeline substitutes, with
+  // realistic sample values, so the preview shows what a recipient would
+  // actually see rather than raw {{tokens}}.
+  const renderPreviewHtml = (temp: any) => {
+    if (!temp?.body) return '';
+    return temp.body
+      .replaceAll('{{greeting}}', 'Hi')
+      .replaceAll('{{first_name}}', 'Alex')
+      .replaceAll('{{email}}', 'alex.morgan@yourcompany.com')
+      .replaceAll('{{phishing_link}}', '#preview-only');
+  };
+
   const filteredTemplates = templates.filter((t) => {
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           t.subject.toLowerCase().includes(searchQuery.toLowerCase());
@@ -304,26 +316,25 @@ export default function TemplatesPage() {
 
       {/* Preview Modal */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Email Template Preview</DialogTitle>
-            <DialogDescription>Review how the simulation payload renders in Outlook/Gmail clients.</DialogDescription>
+            <DialogDescription>Exactly how this simulation payload renders in a recipient&apos;s inbox, with sample data filled in.</DialogDescription>
           </DialogHeader>
 
           {activeTemplate && (
             <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
               <div className="bg-slate-50 p-3 border-b border-slate-200 font-semibold space-y-1">
-                <div><span className="text-slate-400">From:</span> IT Security Audit &lt;simulated@gateway.workmateshield&gt;</div>
+                <div><span className="text-slate-400">From:</span> {activeTemplate.sender_name || 'IT Security Team'} &lt;security@yourcompany.com&gt;</div>
                 <div><span className="text-slate-400">Subject:</span> {activeTemplate.subject}</div>
               </div>
-              <div className="p-4 bg-white min-h-[150px] leading-relaxed text-slate-700 whitespace-pre-line">
-                {activeTemplate.body}
-                <div className="mt-6">
-                  <a href="#" className="inline-block bg-primary hover:bg-primary-dark text-white font-semibold px-4 py-2 rounded-md shadow-xs select-none pointer-events-none">
-                    Confirm Account Validation
-                  </a>
-                </div>
-              </div>
+              <iframe
+                title="Email preview"
+                sandbox=""
+                srcDoc={renderPreviewHtml(activeTemplate)}
+                className="w-full bg-white"
+                style={{ height: '480px', border: 'none' }}
+              />
             </div>
           )}
 

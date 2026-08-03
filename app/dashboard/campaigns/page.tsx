@@ -8,11 +8,12 @@ import {
   User, 
   Globe, 
   Settings, 
-  Trash2, 
-  CheckCircle2, 
+  Trash2,
+  CheckCircle2,
   AlertTriangle,
   Play,
-  RefreshCw
+  RefreshCw,
+  Eye
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -33,6 +34,7 @@ export default function CampaignsPage() {
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
+  const [previewTemplate, setPreviewTemplate] = useState<any | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'draft' | 'completed'>('all');
 
   // Form states
@@ -154,6 +156,15 @@ export default function CampaignsPage() {
     } catch (err: any) {
       toast.error('Deletion error: ' + err.message);
     }
+  };
+
+  const renderTemplatePreviewHtml = (temp: any) => {
+    if (!temp?.body) return '';
+    return temp.body
+      .replaceAll('{{greeting}}', 'Hi')
+      .replaceAll('{{first_name}}', 'Alex')
+      .replaceAll('{{email}}', 'alex.morgan@yourcompany.com')
+      .replaceAll('{{phishing_link}}', '#preview-only');
   };
 
   const filteredCampaigns = campaigns.filter(camp => {
@@ -400,9 +411,19 @@ export default function CampaignsPage() {
                         <p className="text-[10px] text-slate-500">{temp.description}</p>
                       </div>
                     </div>
-                    {newCampaign.templateId === tempId && (
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-slate-400 hover:text-primary"
+                        onClick={(e) => { e.stopPropagation(); setPreviewTemplate(temp); }}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      {newCampaign.templateId === tempId && (
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -458,6 +479,36 @@ export default function CampaignsPage() {
                 </Button>
               )}
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Preview Dialog */}
+      <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplate(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Email Template Preview</DialogTitle>
+            <DialogDescription>Exactly how this template renders in a recipient&apos;s inbox, with sample data filled in.</DialogDescription>
+          </DialogHeader>
+          {previewTemplate && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+              <div className="bg-slate-50 p-3 border-b border-slate-200 font-semibold space-y-1">
+                <div><span className="text-slate-400">From:</span> {newCampaign.senderName || 'IT Security Team'} &lt;security@yourcompany.com&gt;</div>
+                <div><span className="text-slate-400">Subject:</span> {previewTemplate.subject}</div>
+              </div>
+              <iframe
+                title="Email preview"
+                sandbox=""
+                srcDoc={renderTemplatePreviewHtml(previewTemplate)}
+                className="w-full bg-white"
+                style={{ height: '440px', border: 'none' }}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button size="sm" onClick={() => setPreviewTemplate(null)}>
+              Close Preview
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
