@@ -106,6 +106,22 @@ export default function LoginPage() {
       await completeSignIn();
       toast.success('Signed in successfully.');
     } catch (err: any) {
+      // Clerk's client sometimes already holds a valid session (e.g. from an
+      // earlier sign-in on this browser) before this component's isSignedIn
+      // state has caught up, so signIn.create() rejects with "session
+      // already exists" instead of just letting the existing session
+      // through. Since a session genuinely IS active at that point, finish
+      // signing into this app with it rather than dead-ending on an error.
+      const code = err?.errors?.[0]?.code || '';
+      if (code === 'session_exists' || /already signed in|session.*exists/i.test(err?.message || '')) {
+        try {
+          await completeSignIn();
+          toast.success('Signed in successfully.');
+          return;
+        } catch {
+          // fall through to the generic error below
+        }
+      }
       const message = err?.errors?.[0]?.message || err.message || 'Invalid corporate email or password.';
       toast.error(message);
     } finally {
