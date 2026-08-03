@@ -13,7 +13,9 @@ import {
   AlertTriangle,
   Play,
   RefreshCw,
-  Eye
+  Eye,
+  Clock,
+  XCircle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -35,6 +37,9 @@ export default function CampaignsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [previewTemplate, setPreviewTemplate] = useState<any | null>(null);
+  const [scheduleCampaign, setScheduleCampaign] = useState<any | null>(null);
+  const [scheduleDateTime, setScheduleDateTime] = useState('');
+  const [scheduling, setScheduling] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'draft' | 'completed'>('all');
 
   // Form states
@@ -130,13 +135,31 @@ export default function CampaignsPage() {
     );
   };
 
+  const [launchingId, setLaunchingId] = useState<string | null>(null);
+
   const handleLaunchCampaign = async (id: string, name: string) => {
+    setLaunchingId(id);
     try {
       await api.campaigns.send(id);
-      toast.success(`Phishing simulation "${name}" launched successfully! Emails queued.`);
-      loadData();
+      toast.success(`Phishing simulation "${name}" queued — sending now.`);
+
+      // The send happens in a background job on the server; the campaign's
+      // real counts don't exist yet the instant this call returns. Poll
+      // status until the job actually finishes, then refresh, instead of
+      // reloading once immediately (which just showed stale/draft data and
+      // made it look like nothing happened until a manual page refresh).
+      const deadline = Date.now() + 60_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const status = await api.campaigns.sendStatus(id);
+        if (status.state === 'done' || status.state === 'error' || status.state === 'idle') break;
+      }
+      toast.success(`"${name}" finished sending.`);
+      await loadData();
     } catch (err: any) {
       toast.error('Failed to launch campaign: ' + err.message);
+    } finally {
+      setLaunchingId(null);
     }
   };
 
@@ -155,6 +178,37 @@ export default function CampaignsPage() {
       loadData();
     } catch (err: any) {
       toast.error('Deletion error: ' + err.message);
+    }
+  };
+
+  const openScheduleDialog = (camp: any) => {
+    setScheduleCampaign(camp);
+    setScheduleDateTime(camp.scheduledAt ? camp.scheduledAt.slice(0, 16) : '');
+  };
+
+  const handleConfirmSchedule = async () => {
+    if (!scheduleCampaign || !scheduleDateTime) return;
+    setScheduling(true);
+    try {
+      const isoValue = new Date(scheduleDateTime).toISOString();
+      await api.campaigns.schedule(scheduleCampaign._id || scheduleCampaign.id, isoValue);
+      toast.success(`"${scheduleCampaign.name}" scheduled for ${new Date(isoValue).toLocaleString()}.`);
+      setScheduleCampaign(null);
+      loadData();
+    } catch (err: any) {
+      toast.error('Failed to schedule campaign: ' + err.message);
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const handleCancelSchedule = async (camp: any) => {
+    try {
+      await api.campaigns.schedule(camp._id || camp.id, null);
+      toast.success(`Cancelled the scheduled send for "${camp.name}".`);
+      loadData();
+    } catch (err: any) {
+      toast.error('Failed to cancel schedule: ' + err.message);
     }
   };
 
@@ -254,18 +308,52 @@ export default function CampaignsPage() {
                         }>
                           {camp.status}
                         </Badge>
+                        {camp.status === 'draft' && camp.scheduledAt && (
+                          <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> {new Date(camp.scheduledAt).toLocaleString()}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1.5">
                           {camp.status === 'draft' && (
-                            <Button 
-                              variant="primary" 
-                              size="sm" 
-                              onClick={() => handleLaunchCampaign(idVal, camp.name)}
-                              className="h-8"
-                            >
-                              <Play className="h-3.5 w-3.5 mr-1 fill-current" /> Deploy
-                            </Button>
+                            <>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => handleLaunchCampaign(idVal, camp.name)}
+                                loading={launchingId === idVal}
+                                disabled={launchingId !== null && launchingId !== idVal}
+                                className="h-8"
+                              >
+                                {launchingId === idVal ? 'Sending...' : (
+                                  <>
+                                    <Play className="h-3.5 w-3.5 mr-1 fill-current" /> Deploy
+                                  </>
+                                )}
+                              </Button>
+                              {camp.scheduledAt ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-400 hover:text-destructive"
+                                  onClick={() => handleCancelSchedule(camp)}
+                                  title="Cancel scheduled send"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-400 hover:text-primary"
+                                  onClick={() => openScheduleDialog(camp)}
+                                  title="Schedule for later"
+                                >
+                                  <Clock className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </>
                           )}
                           <Button 
                             variant="ghost" 
@@ -508,6 +596,35 @@ export default function CampaignsPage() {
           <DialogFooter>
             <Button size="sm" onClick={() => setPreviewTemplate(null)}>
               Close Preview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Dialog */}
+      <Dialog open={!!scheduleCampaign} onOpenChange={(open) => !open && setScheduleCampaign(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Schedule Deployment</DialogTitle>
+            <DialogDescription>
+              Choose when &quot;{scheduleCampaign?.name}&quot; should automatically send — no need to be online at that time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 text-xs font-semibold">
+            <label className="block text-slate-700 mb-1">Send Date & Time</label>
+            <Input
+              type="datetime-local"
+              min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+              value={scheduleDateTime}
+              onChange={(e) => setScheduleDateTime(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setScheduleCampaign(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleConfirmSchedule} loading={scheduling} disabled={!scheduleDateTime}>
+              Confirm Schedule
             </Button>
           </DialogFooter>
         </DialogContent>

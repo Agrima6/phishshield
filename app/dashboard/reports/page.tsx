@@ -16,6 +16,33 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+async function loadImageAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function ReportsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -42,8 +69,95 @@ export default function ReportsPage() {
     loadData();
   }, []);
 
-  const handleExportReport = (format: 'csv' | 'pdf') => {
-    toast.success(`Exporting simulation intelligence data in ${format.toUpperCase()} format. Download started.`);
+  const handleExportReport = async (format: 'csv' | 'pdf') => {
+    const deptRows = getDeptStats();
+    const dateLabel = new Date().toLocaleDateString();
+
+    if (format === 'csv') {
+      const rows: (string | number)[][] = [
+        ['Department', 'Employees', 'Simulations Run', 'Clicks', 'Risk'],
+        ...deptRows.map((d) => [d.dept, d.count, d.runs, d.clicks, d.risk]),
+        [],
+        ['Campaign Name', 'Subject', 'Sent', 'Opened', 'Clicked'],
+        ...campaigns.map((c) => [
+          c.name,
+          c.subject,
+          c.sentCount || c.sent_count || 0,
+          c.openedCount || c.opened_count || 0,
+          c.clickedCount || c.clicked_count || 0,
+        ]),
+      ];
+      downloadCsv(`workmate-shield-report-${dateLabel}.csv`, rows);
+      toast.success('CSV report downloaded.');
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+      const logoDataUrl = await loadImageAsDataUrl('/workmate-shield-logo.png');
+      let y = 15;
+
+      if (logoDataUrl) {
+        doc.addImage(logoDataUrl, 'PNG', 14, 10, 16, 16);
+      }
+      doc.setFontSize(16);
+      doc.setTextColor(122, 18, 32); // brand maroon
+      doc.text('Workmate Shield', logoDataUrl ? 34 : 14, 20);
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Security Awareness — Simulation Report', logoDataUrl ? 34 : 14, 26);
+      doc.text(`Generated ${dateLabel}`, 14, 34);
+      y = 42;
+
+      doc.setFontSize(12);
+      doc.setTextColor(30, 30, 30);
+      doc.text('Summary', 14, y);
+      y += 6;
+      autoTable(doc, {
+        startY: y,
+        head: [['Total Simulated Emails', 'Click Rate', 'Vigilance Score']],
+        body: [[String(totalSent), `${clickRate}%`, `${vigilanceScore}%`]],
+        theme: 'grid',
+        headStyles: { fillColor: [122, 18, 32] },
+      });
+      // @ts-expect-error - jspdf-autotable augments the doc instance at runtime
+      y = doc.lastAutoTable.finalY + 10;
+
+      doc.setFontSize(12);
+      doc.text('Department Vigilance Audit', 14, y);
+      y += 6;
+      autoTable(doc, {
+        startY: y,
+        head: [['Department', 'Employees', 'Simulations Run', 'Clicks', 'Risk']],
+        body: deptRows.map((d) => [d.dept, d.count, d.runs, d.clicks, d.risk]),
+        theme: 'grid',
+        headStyles: { fillColor: [122, 18, 32] },
+      });
+      // @ts-expect-error - jspdf-autotable augments the doc instance at runtime
+      y = doc.lastAutoTable.finalY + 10;
+
+      doc.setFontSize(12);
+      doc.text('Campaign Summary', 14, y);
+      y += 6;
+      autoTable(doc, {
+        startY: y,
+        head: [['Campaign', 'Subject', 'Sent', 'Opened', 'Clicked']],
+        body: campaigns.map((c) => [
+          c.name,
+          c.subject,
+          c.sentCount || c.sent_count || 0,
+          c.openedCount || c.opened_count || 0,
+          c.clickedCount || c.clicked_count || 0,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [122, 18, 32] },
+      });
+
+      doc.save(`workmate-shield-report-${dateLabel}.pdf`);
+      toast.success('PDF report downloaded.');
+    } catch (err: any) {
+      toast.error('Failed to generate PDF report: ' + err.message);
+    }
   };
 
   // Calculations

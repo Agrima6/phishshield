@@ -343,7 +343,53 @@ export default function EmployeesPage() {
 
           {!importResult ? (
             <div className="space-y-4 py-4 text-xs font-semibold">
-              <div 
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+                  <span className="text-slate-600">Expected format</span>
+                  <button
+                    type="button"
+                    className="text-primary hover:underline font-semibold"
+                    onClick={() => {
+                      const csv = 'name,email,department,manager\nJordan Lee,jordan.lee@yourcompany.com,Engineering,Priya Shah\nSam Patel,sam.patel@yourcompany.com,Sales,Priya Shah\n';
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = 'employee-directory-template.csv';
+                      link.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Download Template
+                  </button>
+                </div>
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="bg-white text-slate-400 border-b border-slate-100">
+                      <th className="text-left font-semibold px-3 py-1.5">name</th>
+                      <th className="text-left font-semibold px-3 py-1.5">email</th>
+                      <th className="text-left font-semibold px-3 py-1.5">department</th>
+                      <th className="text-left font-semibold px-3 py-1.5">manager</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate-600 font-normal">
+                    <tr className="border-b border-slate-50">
+                      <td className="px-3 py-1.5">Jordan Lee</td>
+                      <td className="px-3 py-1.5">jordan.lee@yourcompany.com</td>
+                      <td className="px-3 py-1.5">Engineering</td>
+                      <td className="px-3 py-1.5">Priya Shah</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-1.5">Sam Patel</td>
+                      <td className="px-3 py-1.5">sam.patel@yourcompany.com</td>
+                      <td className="px-3 py-1.5">Sales</td>
+                      <td className="px-3 py-1.5">Priya Shah</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div
                 className="py-8 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors relative"
                 onClick={() => document.getElementById('csv-file-input')?.click()}
               >

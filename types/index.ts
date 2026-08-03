@@ -34,6 +34,7 @@ export interface Campaign {
   subject: string;
   senderName: string;
   emailConfigId?: string;
+  scheduledAt?: string;
   sentCount: number;
   openedCount: number;
   clickedCount: number;

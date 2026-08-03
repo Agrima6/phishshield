@@ -104,6 +104,7 @@ export function mapBackendToCampaign(backend: any): Campaign {
     subject: backend.subject,
     senderName: backend.sender_name || 'Security Team',
     emailConfigId: backend.email_config_id || undefined,
+    scheduledAt: backend.scheduled_at || undefined,
     sentCount: backend.total_sent || 0,
     openedCount: backend.total_opened || 0,
     clickedCount: backend.total_clicked || 0,
@@ -248,6 +249,12 @@ export const api = {
     },
     sendStatus: async (id: string) => {
       return fetcher<any>(`/api/phish/campaigns/${id}/send/status`);
+    },
+    schedule: async (id: string, scheduledAt: string | null) => {
+      return fetcher<{ scheduled_at: string | null }>(`/api/phish/campaigns/${id}/schedule`, {
+        method: 'POST',
+        body: JSON.stringify({ scheduled_at: scheduledAt }),
+      });
     },
     clearFailed: async (id: string) => {
       return fetcher<{ cleared: number }>(`/api/phish/campaigns/${id}/failed`, {
