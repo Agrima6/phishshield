@@ -46,7 +46,7 @@ export default function SignUpPage() {
       throw new Error('Could not obtain a session token from Clerk.');
     }
     const session = await api.auth.establishSession(token);
-    login('clerk', session.email, session.role, 'default', 'Default Tenant');
+    login('clerk', session.email, session.role, 'default', 'Default Tenant', session.name);
     toast.success('Account created and signed in.');
     router.push('/dashboard');
   };

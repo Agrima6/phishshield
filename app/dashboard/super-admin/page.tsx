@@ -9,7 +9,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { ShieldCheck, Building, Plus, Mail, Key, ShieldAlert, Globe, Calendar, Send, Users, MousePointerClick } from 'lucide-react';
+import { ShieldCheck, Building, Plus, Mail, Key, ShieldAlert, Globe, Calendar, Send, Users, MousePointerClick, UserPlus, Trash2 } from 'lucide-react';
 
 interface TenantStats {
   id: string;
@@ -19,6 +19,12 @@ interface TenantStats {
   campaigns_count: number;
   users_count: number;
   clicks_count: number;
+}
+
+interface AllowlistEntry {
+  id: string;
+  identifier: string;
+  created_at: number;
 }
 
 export default function SuperAdminPage() {
@@ -35,6 +41,53 @@ export default function SuperAdminPage() {
     admin_email: '',
     admin_password: '',
   });
+
+  const [allowlist, setAllowlist] = useState<AllowlistEntry[]>([]);
+  const [allowlistLoading, setAllowlistLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+
+  const loadAllowlist = async () => {
+    setAllowlistLoading(true);
+    try {
+      const data = await api.admin.allowlist.list();
+      setAllowlist(data);
+    } catch (err: any) {
+      toast.error('Failed to load authorized sign-up emails: ' + err.message);
+    } finally {
+      setAllowlistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAllowlist();
+  }, []);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      await api.admin.allowlist.add(inviteEmail.trim());
+      toast.success(`${inviteEmail.trim()} can now create an account.`);
+      setInviteEmail('');
+      loadAllowlist();
+    } catch (err: any) {
+      toast.error('Failed to authorize email: ' + err.message);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRevoke = async (id: string, identifier: string) => {
+    try {
+      await api.admin.allowlist.remove(id);
+      toast.success(`Revoked access for ${identifier}.`);
+      loadAllowlist();
+    } catch (err: any) {
+      toast.error('Failed to revoke: ' + err.message);
+    }
+  };
 
   const loadTenants = async () => {
     if (tenant !== 'default') return;
@@ -96,7 +149,7 @@ export default function SuperAdminPage() {
         <ShieldAlert className="h-16 w-16 text-destructive animate-pulse" />
         <h2 className="text-xl font-bold text-slate-800 font-sans">Access Restricted</h2>
         <p className="text-sm max-w-md text-center">
-          Only the Super Administrator of the PhishShield SaaS Platform is authorized to access the onboarded tenant directory.
+          Only the Super Administrator of the Workmate Shield SaaS Platform is authorized to access the onboarded tenant directory.
         </p>
       </div>
     );
@@ -114,8 +167,59 @@ export default function SuperAdminPage() {
         </div>
       </div>
 
+      {/* Authorized Sign-Up Emails */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-primary" /> Authorized Sign-Up Emails
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Public sign-up is disabled — only emails added here can create an account. Add a colleague&apos;s
+            work email below, and they&apos;ll be able to register themselves at the sign-up page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleInvite} className="flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Mail className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                type="email"
+                required
+                placeholder="colleague@yourcompany.com"
+                className="pl-9"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
+            </div>
+            <Button type="submit" loading={inviting} className="shrink-0">
+              <Plus className="h-4 w-4 mr-1.5" /> Authorize
+            </Button>
+          </form>
+
+          {allowlistLoading ? (
+            <div className="flex items-center gap-2 text-xs text-slate-400 py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Loading authorized emails...
+            </div>
+          ) : allowlist.length === 0 ? (
+            <p className="text-xs text-slate-400 py-4 text-center">No emails authorized yet — add one above to let them sign up.</p>
+          ) : (
+            <div className="space-y-2">
+              {allowlist.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-2.5 border border-slate-200 rounded-lg text-xs">
+                  <span className="font-semibold text-slate-800">{entry.identifier}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-destructive" onClick={() => handleRevoke(entry.id, entry.identifier)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-        
+
         {/* Onboarding Form */}
         <Card className="xl:col-span-1 shadow-sm">
           <CardHeader>

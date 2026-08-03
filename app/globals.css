@@ -10,9 +10,21 @@
   --color-popover: #ffffff;
   --color-popover-foreground: #0f172a;
   
-  --color-primary: #d97706; /* Amber-600 for premium legibility */
-  --color-primary-hover: #b45309; /* Amber-700 */
+  --color-primary: #7a1220; /* Workmate Shield dark maroon */
+  --color-primary-hover: #5c0e18; /* Darker maroon for hover */
   --color-primary-foreground: #ffffff;
+
+  /* Workmate Shield brand palette - overrides Tailwind's amber scale so
+     every existing amber utility class renders as brand maroon without
+     touching each call site individually. */
+  --color-amber-50: #fbeced;
+  --color-amber-200: #eeb4ba;
+  --color-amber-500: #9c1a2a;
+  --color-amber-600: #7a1220;
+  --color-amber-700: #5c0e18;
+  --color-amber-800: #45090f;
+  --color-amber-900: #2e0a0d;
+  --color-amber-950: #1c0507;
   
   --color-secondary: #f8f9fa; /* Very Light Gray */
   --color-secondary-foreground: #334155;

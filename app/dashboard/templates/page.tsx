@@ -313,7 +313,7 @@ export default function TemplatesPage() {
           {activeTemplate && (
             <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
               <div className="bg-slate-50 p-3 border-b border-slate-200 font-semibold space-y-1">
-                <div><span className="text-slate-400">From:</span> IT Security Audit &lt;simulated@gateway.phishshield&gt;</div>
+                <div><span className="text-slate-400">From:</span> IT Security Audit &lt;simulated@gateway.workmateshield&gt;</div>
                 <div><span className="text-slate-400">Subject:</span> {activeTemplate.subject}</div>
               </div>
               <div className="p-4 bg-white min-h-[150px] leading-relaxed text-slate-700 whitespace-pre-line">

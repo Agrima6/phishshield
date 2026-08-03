@@ -418,7 +418,7 @@ export default function CampaignsPage() {
                   value={newCampaign.emailConfigId}
                   onChange={(e) => setNewCampaign({ ...newCampaign, emailConfigId: e.target.value })}
                 >
-                  <option value="">Default System gateway (PhishShield Shared SMTP)</option>
+                  <option value="">Default System gateway (Workmate Shield Shared SMTP)</option>
                   {settings?.emailConfigs.map((cfg: any) => (
                     <option key={cfg.id} value={cfg.id}>
                       {cfg.name} ({cfg.provider === 'smtp' ? 'SMTP' : 'SendGrid'}) — {cfg.fromEmail}

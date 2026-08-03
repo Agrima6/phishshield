@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
@@ -233,12 +234,10 @@ export default function DashboardLayout({
           {/* Logo header */}
           <div className="h-16 flex items-center px-6 border-b border-slate-100 justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="h-8 w-8 bg-amber-500 rounded-md flex items-center justify-center font-bold text-slate-950 text-base shadow-xs shrink-0">
-                P
-              </div>
+              <Image src="/workmate-shield-logo.png" alt="Workmate Shield" width={32} height={32} className="h-8 w-8 rounded-md shadow-xs shrink-0" />
               {sidebarOpen && (
                 <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
-                  PHISHSHIELD <span className="text-amber-600">ENT</span>
+                  WORKMATE <span className="text-primary">SHIELD</span>
                 </span>
               )}
             </div>

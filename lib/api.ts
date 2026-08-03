@@ -322,6 +322,20 @@ export const api = {
         });
       },
     },
+    allowlist: {
+      list: async () => {
+        return fetcher<{ id: string; identifier: string; created_at: number }[]>('/api/admin/allowlist');
+      },
+      add: async (email: string) => {
+        return fetcher<any>('/api/admin/allowlist', {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+        });
+      },
+      remove: async (id: string) => {
+        return fetcher<any>(`/api/admin/allowlist/${id}`, { method: 'DELETE' });
+      },
+    },
   },
 
   templates: {

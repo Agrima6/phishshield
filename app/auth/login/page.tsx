@@ -64,7 +64,7 @@ export default function LoginPage() {
       throw new Error('Could not obtain a session token from Clerk.');
     }
     const session = await api.auth.establishSession(token);
-    login('clerk', session.email, session.role, 'default', 'Default Tenant');
+    login('clerk', session.email, session.role, 'default', 'Default Tenant', session.name);
     router.push('/dashboard');
   };
 
@@ -278,10 +278,7 @@ export default function LoginPage() {
       </Button>
 
       <p className="text-xs text-center text-slate-500 mt-6">
-        Don&apos;t have an account?{' '}
-        <a href="/auth/sign-up" className="text-primary hover:text-primary-hover font-semibold transition-colors">
-          Sign up
-        </a>
+        New employee accounts are provisioned by your administrator — contact them for access.
       </p>
     </div>
   );

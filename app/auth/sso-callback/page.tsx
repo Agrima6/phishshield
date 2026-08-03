@@ -26,7 +26,7 @@ export default function SSOCallbackPage() {
         }
         const session = await api.auth.establishSession(token);
         if (cancelled) return;
-        login('clerk', session.email, session.role, 'default', 'Default Tenant');
+        login('clerk', session.email, session.role, 'default', 'Default Tenant', session.name);
         router.push('/dashboard');
       } catch (err: any) {
         if (!cancelled) {

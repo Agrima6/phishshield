@@ -16,8 +16,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { useSession } from '@/hooks/use-session';
 import Link from 'next/link';
 import { toast } from 'sonner';
+
+function greetingForHour(hour: number): string {
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 function timeAgo(isoTimestamp: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(isoTimestamp).getTime()) / 1000));
@@ -31,6 +38,8 @@ function timeAgo(isoTimestamp: string): string {
 }
 
 export default function OverviewPage() {
+  const { username, displayName } = useSession();
+  const [greeting, setGreeting] = useState('Good morning');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [departmentRates, setDepartmentRates] = useState<{ department: string; rate: number; total_recipients: number }[]>([]);
@@ -63,6 +72,19 @@ export default function OverviewPage() {
     loadData();
   }, []);
 
+  // Computed client-side only (after mount) to avoid an SSR/client hydration
+  // mismatch, since the greeting depends on the viewer's local clock.
+  useEffect(() => {
+    setGreeting(greetingForHour(new Date().getHours()));
+  }, []);
+
+  const friendlyName = (() => {
+    if (displayName && displayName !== username) return displayName.split(' ')[0];
+    const prefix = (username || '').split('@')[0].split('+')[0];
+    if (!prefix) return '';
+    return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  })();
+
   // Compute analytics from active tenant's campaigns
   const totalSent = campaigns.reduce((acc, c) => acc + (c.sentCount || c.sent_count || 0), 0);
   const totalOpened = campaigns.reduce((acc, c) => acc + (c.openedCount || c.opened_count || 0), 0);
@@ -82,6 +104,9 @@ export default function OverviewPage() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
+          {friendlyName && (
+            <p className="text-sm font-semibold text-primary mb-1">{greeting}, {friendlyName}</p>
+          )}
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-sans">Overview Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">Real-time simulation metrics, compliance scores, and human risk telemetry.</p>
         </div>
