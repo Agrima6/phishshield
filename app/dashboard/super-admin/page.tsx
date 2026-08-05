@@ -7,18 +7,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { ShieldCheck, Building, Plus, Mail, Key, ShieldAlert, Globe, Calendar, Send, Users, MousePointerClick, UserPlus, Trash2 } from 'lucide-react';
+import { ShieldCheck, Building, Plus, Mail, Phone, Briefcase, ShieldAlert, Calendar, Send, Users, UserPlus, Trash2, Pencil } from 'lucide-react';
 
-interface TenantStats {
+interface TenantRow {
   id: string;
-  name: string;
-  domains: string[];
+  company_name: string;
+  contact_email: string;
+  contact_mobile: string;
+  designation: string;
+  admin_email: string;
+  primary_color: string;
+  status: string;
   created_at: string;
-  campaigns_count: number;
-  users_count: number;
-  clicks_count: number;
+  employee_count: number;
+  campaign_count: number;
 }
 
 interface AllowlistEntry {
@@ -27,25 +32,34 @@ interface AllowlistEntry {
   created_at: number;
 }
 
+const emptyForm = {
+  company_name: '',
+  contact_email: '',
+  contact_mobile: '',
+  designation: '',
+  admin_email: '',
+};
+
 export default function SuperAdminPage() {
-  const { tenant } = useSession();
-  const [tenantsList, setTenantsList] = useState<TenantStats[]>([]);
+  const { role } = useSession();
+  const [tenantsList, setTenantsList] = useState<TenantRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // New Tenant Form State
-  const [formData, setFormData] = useState({
-    tenant_id: '',
-    name: '',
-    domain: '',
-    admin_email: '',
-    admin_password: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
 
   const [allowlist, setAllowlist] = useState<AllowlistEntry[]>([]);
   const [allowlistLoading, setAllowlistLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
+
+  const [editTarget, setEditTarget] = useState<TenantRow | null>(null);
+  const [editForm, setEditForm] = useState(emptyForm);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TenantRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const isSuperAdmin = role === 'super_admin';
 
   const loadAllowlist = async () => {
     setAllowlistLoading(true);
@@ -59,9 +73,24 @@ export default function SuperAdminPage() {
     }
   };
 
+  const loadTenants = async () => {
+    setLoading(true);
+    try {
+      const data = await api.admin.tenants.list();
+      setTenantsList(data);
+    } catch (err: any) {
+      toast.error('Failed to load company directory: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    if (!isSuperAdmin) return;
     loadAllowlist();
-  }, []);
+    loadTenants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,67 +118,77 @@ export default function SuperAdminPage() {
     }
   };
 
-  const loadTenants = async () => {
-    if (tenant !== 'default') return;
-    setLoading(true);
-    try {
-      const data = await api.admin.tenants.list();
-      setTenantsList(data);
-    } catch (err: any) {
-      toast.error('Failed to load tenants directory: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTenants();
-  }, [tenant]);
-
   const handleOnboard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.tenant_id || !formData.name || !formData.admin_email || !formData.admin_password) {
-      toast.error('Please fill in all required onboarding fields.');
+    if (!formData.company_name || !formData.contact_email || !formData.admin_email) {
+      toast.error('Company name, contact email, and admin email are required.');
       return;
     }
-
     setSubmitting(true);
     try {
-      const domains = formData.domain ? [formData.domain.trim()] : [];
-      await api.admin.tenants.create({
-        tenant_id: formData.tenant_id.trim().toLowerCase(),
-        name: formData.name.trim(),
-        domains,
-        admin_email: formData.admin_email.trim(),
-        admin_password: formData.admin_password,
-      });
-
-      toast.success(`Tenant ${formData.name} onboarded successfully! Share credentials with the client.`);
-      
-      // Reset form
-      setFormData({
-        tenant_id: '',
-        name: '',
-        domain: '',
-        admin_email: '',
-        admin_password: '',
-      });
-      
+      const result = await api.admin.tenants.create(formData);
+      if (result.invite_warning) {
+        toast.warning(result.invite_warning);
+      } else {
+        toast.success(`${formData.company_name} onboarded — an invite was sent to ${formData.admin_email}.`);
+      }
+      setFormData(emptyForm);
       loadTenants();
     } catch (err: any) {
-      toast.error('Failed to onboard tenant: ' + err.message);
+      toast.error('Failed to onboard company: ' + err.message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (tenant !== 'default') {
+  const openEdit = (t: TenantRow) => {
+    setEditTarget(t);
+    setEditForm({
+      company_name: t.company_name,
+      contact_email: t.contact_email,
+      contact_mobile: t.contact_mobile || '',
+      designation: t.designation || '',
+      admin_email: t.admin_email,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    setSavingEdit(true);
+    try {
+      await api.admin.tenants.update(editTarget.id, editForm);
+      toast.success('Company details updated.');
+      setEditTarget(null);
+      loadTenants();
+    } catch (err: any) {
+      toast.error('Failed to update company: ' + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.admin.tenants.remove(deleteTarget.id);
+      toast.success(`${deleteTarget.company_name} and all of its data were deleted.`);
+      setDeleteTarget(null);
+      loadTenants();
+    } catch (err: any) {
+      toast.error('Failed to delete company: ' + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (!isSuperAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-500 gap-4">
         <ShieldAlert className="h-16 w-16 text-destructive animate-pulse" />
         <h2 className="text-xl font-bold text-slate-800 font-sans">Access Restricted</h2>
         <p className="text-sm max-w-md text-center">
-          Only the Super Administrator of the Workmate Shield SaaS Platform is authorized to access the onboarded tenant directory.
+          Only the Super Administrator of the Workmate Shield SaaS Platform is authorized to access the company directory.
         </p>
       </div>
     );
@@ -158,12 +197,12 @@ export default function SuperAdminPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-amber-500 text-slate-950">
+        <div className="p-2 rounded-lg bg-primary text-primary-foreground">
           <ShieldCheck className="h-6 w-6" />
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-sans">Super Admin SaaS Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Onboard client workspaces, monitor tenant engagement, and control database partitions.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Onboard client companies, monitor engagement, and manage isolated data partitions.</p>
         </div>
       </div>
 
@@ -224,136 +263,135 @@ export default function SuperAdminPage() {
         <Card className="xl:col-span-1 shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Building className="h-4 w-4 text-primary" /> Onboard New Tenant Workspace
+              <Building className="h-4 w-4 text-primary" /> Onboard New Company
             </CardTitle>
             <CardDescription className="text-xs">
-              Provision a new isolated database partition and seed the initial corporate admin identity.
+              Creates a fully isolated data partition for this company and invites their first admin by email.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleOnboard} className="space-y-4 text-xs font-semibold">
               <div>
-                <label className="block text-slate-700 mb-1">Company Workspace Name</label>
-                <Input 
-                  required
-                  placeholder="e.g. Peardo International"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
+                <label className="block text-slate-700 mb-1">Company Name</label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    required
+                    placeholder="e.g. Peardo International"
+                    className="pl-9"
+                    value={formData.company_name}
+                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Unique Tenant ID (slug)</label>
-                <Input 
-                  required
-                  placeholder="e.g. peardo"
-                  value={formData.tenant_id}
-                  onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
-                />
-                <span className="text-[10px] text-slate-400 font-normal mt-1 block">
-                  Lowercase letters, numbers, and hyphens only.
-                </span>
+                <label className="block text-slate-700 mb-1">Contact Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    required
+                    type="email"
+                    placeholder="ops@peardo.com"
+                    className="pl-9"
+                    value={formData.contact_email}
+                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Primary Routing Domain (Optional)</label>
-                <Input 
-                  placeholder="e.g. peardo.com"
-                  value={formData.domain}
-                  onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
-                />
+                <label className="block text-slate-700 mb-1">Contact Mobile Number</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    placeholder="+1 555 123 4567"
+                    className="pl-9"
+                    value={formData.contact_mobile}
+                    onChange={(e) => setFormData({ ...formData, contact_mobile: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Contact Designation</label>
+                <div className="relative">
+                  <Briefcase className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    placeholder="e.g. IT Director"
+                    className="pl-9"
+                    value={formData.designation}
+                    onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="border-t border-slate-100 pt-4 mt-2">
                 <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2 font-bold">
-                  Corporate Admin Credentials
+                  First Admin Account
                 </span>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-slate-700 mb-1">Admin Email Address</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
-                      <Input 
-                        required
-                        type="email"
-                        placeholder="admin@peardo.com"
-                        className="pl-9"
-                        value={formData.admin_email}
-                        onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 mb-1">Initial Password</label>
-                    <div className="relative">
-                      <Key className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
-                      <Input 
-                        required
-                        type="password"
-                        placeholder="••••••••••••"
-                        className="pl-9"
-                        value={formData.admin_password}
-                        onChange={(e) => setFormData({ ...formData, admin_password: e.target.value })}
-                      />
-                    </div>
-                  </div>
+                <label className="block text-slate-700 mb-1">Admin Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    required
+                    type="email"
+                    placeholder="admin@peardo.com"
+                    className="pl-9"
+                    value={formData.admin_email}
+                    onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
+                  />
                 </div>
+                <span className="text-[10px] text-slate-400 font-normal mt-1 block">
+                  They&apos;ll receive an email invite to set their own password — no password is set here.
+                </span>
               </div>
 
               <Button type="submit" className="w-full mt-4" loading={submitting}>
-                <Plus className="h-4 w-4 mr-2" /> Onboard Tenant
+                <Plus className="h-4 w-4 mr-2" /> Onboard Company
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Tenants List */}
+        {/* Company Registry */}
         <Card className="xl:col-span-2 shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Globe className="h-4 w-4 text-primary" /> Active SaaS Tenant Registry
+              <Building className="h-4 w-4 text-primary" /> Company Directory
             </CardTitle>
             <CardDescription className="text-xs">
-              Live statistics and audit engagement metrics across all tenant partitions.
+              Every onboarded company, with fully isolated employees, campaigns, and templates.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-xs gap-2">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                <span>Loading tenant telemetry...</span>
+                <span>Loading company directory...</span>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tenant Workspace</TableHead>
-                    <TableHead>Mapped Domains</TableHead>
-                    <TableHead>Created At</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Admin / Contact</TableHead>
+                    <TableHead>Onboarded</TableHead>
+                    <TableHead className="text-center">Employees</TableHead>
                     <TableHead className="text-center">Campaigns</TableHead>
-                    <TableHead className="text-center">Users</TableHead>
-                    <TableHead className="text-center">Clicks Tracked</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tenantsList.map((t) => (
                     <TableRow key={t.id}>
                       <TableCell className="py-3">
-                        <div className="font-semibold text-slate-900">{t.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{t.id}</div>
+                        <div className="font-semibold text-slate-900">{t.company_name}</div>
+                        <div className="text-[10px] text-slate-400">{t.designation}</div>
                       </TableCell>
-                      <TableCell className="text-slate-600 max-w-[150px] truncate">
-                        {t.domains.length > 0 ? (
-                          t.domains.map((dom) => (
-                            <Badge key={dom} variant="secondary" className="mr-1 text-[10px]">
-                              {dom}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-400 font-normal italic">None</span>
-                        )}
+                      <TableCell className="text-slate-600 text-xs py-3">
+                        <div>{t.admin_email}</div>
+                        <div className="text-[10px] text-slate-400">{t.contact_mobile || '—'}</div>
                       </TableCell>
                       <TableCell className="text-slate-500 text-xs py-3">
                         <div className="flex items-center gap-1">
@@ -362,26 +400,31 @@ export default function SuperAdminPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center py-3">
-                        <Badge variant="info" className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
-                          <Send className="h-3 w-3 shrink-0" /> {t.campaigns_count}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center py-3">
                         <Badge variant="success" className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
-                          <Users className="h-3 w-3 shrink-0" /> {t.users_count}
+                          <Users className="h-3 w-3 shrink-0" /> {t.employee_count}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center py-3">
-                        <Badge variant={t.clicks_count > 0 ? 'danger' : 'secondary'} className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
-                          <MousePointerClick className="h-3 w-3 shrink-0" /> {t.clicks_count}
+                        <Badge variant="info" className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
+                          <Send className="h-3 w-3 shrink-0" /> {t.campaign_count}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right py-3">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => openEdit(t)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(t)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                   {tenantsList.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-10 text-slate-400 text-xs">
-                        No client tenants configured in SaaS portal.
+                        No companies onboarded yet — use the form to add your first one.
                       </TableCell>
                     </TableRow>
                   )}
@@ -392,6 +435,60 @@ export default function SuperAdminPage() {
         </Card>
 
       </div>
+
+      {/* Edit Company Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Company</DialogTitle>
+            <DialogDescription>Update {editTarget?.company_name}&apos;s details.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-xs font-semibold">
+            <div>
+              <label className="block text-slate-700 mb-1">Company Name</label>
+              <Input value={editForm.company_name} onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-slate-700 mb-1">Contact Email</label>
+              <Input type="email" value={editForm.contact_email} onChange={(e) => setEditForm({ ...editForm, contact_email: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-slate-700 mb-1">Contact Mobile</label>
+              <Input value={editForm.contact_mobile} onChange={(e) => setEditForm({ ...editForm, contact_mobile: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-slate-700 mb-1">Designation</label>
+              <Input value={editForm.designation} onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-slate-700 mb-1">Admin Email</label>
+              <Input type="email" value={editForm.admin_email} onChange={(e) => setEditForm({ ...editForm, admin_email: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button size="sm" onClick={handleSaveEdit} loading={savingEdit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5" /> Delete Company
+            </DialogTitle>
+            <DialogDescription>
+              This permanently deletes {deleteTarget?.company_name} and all of its employees, campaigns, templates, and audit logs. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" size="sm" onClick={handleConfirmDelete} loading={deleting}>Delete Permanently</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

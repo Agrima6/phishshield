@@ -317,16 +317,26 @@ export const api = {
         return fetcher<any[]>('/api/admin/tenants');
       },
       create: async (data: {
-        tenant_id: string;
-        name: string;
-        domains: string[];
+        company_name: string;
+        contact_email: string;
         admin_email: string;
-        admin_password: string;
+        contact_mobile?: string;
+        designation?: string;
+        primary_color?: string;
       }) => {
-        return fetcher<{ message: string }>('/api/admin/tenants', {
+        return fetcher<any>('/api/admin/tenants', {
           method: 'POST',
           body: JSON.stringify(data),
         });
+      },
+      update: async (id: string, data: Record<string, any>) => {
+        return fetcher<any>(`/api/admin/tenants/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+      },
+      remove: async (id: string) => {
+        return fetcher<any>(`/api/admin/tenants/${id}`, { method: 'DELETE' });
       },
     },
     allowlist: {
