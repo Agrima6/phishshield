@@ -56,6 +56,7 @@ export default function CampaignsPage() {
 
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [audienceDeptFilter, setAudienceDeptFilter] = useState<string>('all');
 
   const loadData = async () => {
     setLoading(true);
@@ -420,31 +421,56 @@ export default function CampaignsPage() {
           )}
 
           {/* Wizard Step 2: Select Audience */}
-          {wizardStep === 2 && (
+          {wizardStep === 2 && (() => {
+            const deptOptions = Array.from(new Set(employees.map((e) => e.department).filter(Boolean))).sort();
+            const visibleEmployees = audienceDeptFilter === 'all'
+              ? employees
+              : employees.filter((e) => e.department === audienceDeptFilter);
+            const visibleIds = visibleEmployees.map((e) => e._id || e.id);
+            const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedEmployeeIds.includes(id));
+            return (
             <div className="py-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold text-slate-700">Target Employees</label>
-                <button
-                  type="button"
-                  className="text-[10px] font-semibold text-primary hover:underline"
-                  onClick={() =>
-                    setSelectedEmployeeIds(
-                      selectedEmployeeIds.length === employees.length
-                        ? []
-                        : employees.map((e) => e._id || e.id)
-                    )
-                  }
-                >
-                  {selectedEmployeeIds.length === employees.length ? 'Deselect all' : 'Select all'}
-                </button>
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <label className="block text-xs font-semibold text-slate-700 shrink-0">Target Employees</label>
+                <div className="flex items-center gap-2">
+                  {deptOptions.length > 0 && (
+                    <Select
+                      value={audienceDeptFilter}
+                      onChange={(e) => setAudienceDeptFilter(e.target.value)}
+                      className="h-7 text-[10px] py-0"
+                    >
+                      <option value="all">All departments</option>
+                      {deptOptions.map((dept) => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </Select>
+                  )}
+                  <button
+                    type="button"
+                    className="text-[10px] font-semibold text-primary hover:underline shrink-0"
+                    onClick={() =>
+                      setSelectedEmployeeIds((prev) =>
+                        allVisibleSelected
+                          ? prev.filter((id) => !visibleIds.includes(id))
+                          : Array.from(new Set([...prev, ...visibleIds]))
+                      )
+                    }
+                  >
+                    {allVisibleSelected ? 'Deselect all' : 'Select all'}
+                  </button>
+                </div>
               </div>
               {employees.length === 0 ? (
                 <p className="text-xs text-slate-400 py-6 text-center">
                   No employees in the directory yet. Add employees before creating a campaign.
                 </p>
+              ) : visibleEmployees.length === 0 ? (
+                <p className="text-xs text-slate-400 py-6 text-center">
+                  No employees in this department.
+                </p>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {employees.map((emp) => {
+                  {visibleEmployees.map((emp) => {
                     const empId = emp._id || emp.id;
                     const checked = selectedEmployeeIds.includes(empId);
                     return (
@@ -457,7 +483,7 @@ export default function CampaignsPage() {
                       >
                         <div>
                           <h4 className="font-semibold text-xs text-slate-900">{emp.name}</h4>
-                          <p className="text-[10px] text-slate-500">{emp.email}</p>
+                          <p className="text-[10px] text-slate-500">{emp.email}{emp.department ? ` · ${emp.department}` : ''}</p>
                         </div>
                         <input
                           type="checkbox"
@@ -475,7 +501,8 @@ export default function CampaignsPage() {
                 {selectedEmployeeIds.length} of {employees.length} employee(s) selected.
               </p>
             </div>
-          )}
+            );
+          })()}
 
           {/* Wizard Step 3: Choose Template */}
           {wizardStep === 3 && (

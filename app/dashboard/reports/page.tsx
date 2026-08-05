@@ -71,21 +71,36 @@ export default function ReportsPage() {
 
   const handleExportReport = async (format: 'csv' | 'pdf') => {
     const deptRows = getDeptStats();
-    const dateLabel = new Date().toLocaleDateString();
+    const now = new Date();
+    const dateLabel = now.toLocaleDateString();
+    const generatedLabel = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
 
     if (format === 'csv') {
+      const csvDeptTotals = deptRows.reduce(
+        (acc, d) => ({ count: acc.count + d.count, runs: acc.runs + d.runs, clicks: acc.clicks + d.clicks }),
+        { count: 0, runs: 0, clicks: 0 }
+      );
+      const csvCampaignRows = campaigns.map((c) => [
+        c.name,
+        c.subject,
+        c.sentCount || c.sent_count || 0,
+        c.openedCount || c.opened_count || 0,
+        c.clickedCount || c.clicked_count || 0,
+      ]);
+      const csvCampaignTotals = csvCampaignRows.reduce(
+        (acc, r) => ({ sent: acc.sent + Number(r[2]), opened: acc.opened + Number(r[3]), clicked: acc.clicked + Number(r[4]) }),
+        { sent: 0, opened: 0, clicked: 0 }
+      );
       const rows: (string | number)[][] = [
+        [`Generated ${generatedLabel}`],
+        [],
         ['Department', 'Employees', 'Simulations Run', 'Clicks', 'Risk'],
         ...deptRows.map((d) => [d.dept, d.count, d.runs, d.clicks, d.risk]),
+        ['Total', csvDeptTotals.count, csvDeptTotals.runs, csvDeptTotals.clicks, ''],
         [],
         ['Campaign Name', 'Subject', 'Sent', 'Opened', 'Clicked'],
-        ...campaigns.map((c) => [
-          c.name,
-          c.subject,
-          c.sentCount || c.sent_count || 0,
-          c.openedCount || c.opened_count || 0,
-          c.clickedCount || c.clicked_count || 0,
-        ]),
+        ...csvCampaignRows,
+        ['Total', '', csvCampaignTotals.sent, csvCampaignTotals.opened, csvCampaignTotals.clicked],
       ];
       downloadCsv(`workmate-shield-report-${dateLabel}.csv`, rows);
       toast.success('CSV report downloaded.');
@@ -106,7 +121,7 @@ export default function ReportsPage() {
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text('Security Awareness — Simulation Report', logoDataUrl ? 34 : 14, 26);
-      doc.text(`Generated ${dateLabel}`, 14, 34);
+      doc.text(`Generated ${generatedLabel}`, 14, 34);
       y = 42;
 
       doc.setFontSize(12);
@@ -126,12 +141,18 @@ export default function ReportsPage() {
       doc.setFontSize(12);
       doc.text('Department Vigilance Audit', 14, y);
       y += 6;
+      const deptTotals = deptRows.reduce(
+        (acc, d) => ({ count: acc.count + d.count, runs: acc.runs + d.runs, clicks: acc.clicks + d.clicks }),
+        { count: 0, runs: 0, clicks: 0 }
+      );
       autoTable(doc, {
         startY: y,
         head: [['Department', 'Employees', 'Simulations Run', 'Clicks', 'Risk']],
         body: deptRows.map((d) => [d.dept, d.count, d.runs, d.clicks, d.risk]),
+        foot: [['Total', deptTotals.count, deptTotals.runs, deptTotals.clicks, '']],
         theme: 'grid',
         headStyles: { fillColor: [122, 18, 32] },
+        footStyles: { fillColor: [240, 230, 231], textColor: [122, 18, 32], fontStyle: 'bold' },
       });
       // @ts-expect-error - jspdf-autotable augments the doc instance at runtime
       y = doc.lastAutoTable.finalY + 10;
@@ -139,18 +160,25 @@ export default function ReportsPage() {
       doc.setFontSize(12);
       doc.text('Campaign Summary', 14, y);
       y += 6;
+      const campaignRows = campaigns.map((c) => [
+        c.name,
+        c.subject,
+        c.sentCount || c.sent_count || 0,
+        c.openedCount || c.opened_count || 0,
+        c.clickedCount || c.clicked_count || 0,
+      ]);
+      const campaignTotals = campaignRows.reduce(
+        (acc, r) => ({ sent: acc.sent + Number(r[2]), opened: acc.opened + Number(r[3]), clicked: acc.clicked + Number(r[4]) }),
+        { sent: 0, opened: 0, clicked: 0 }
+      );
       autoTable(doc, {
         startY: y,
         head: [['Campaign', 'Subject', 'Sent', 'Opened', 'Clicked']],
-        body: campaigns.map((c) => [
-          c.name,
-          c.subject,
-          c.sentCount || c.sent_count || 0,
-          c.openedCount || c.opened_count || 0,
-          c.clickedCount || c.clicked_count || 0,
-        ]),
+        body: campaignRows,
+        foot: [['Total', '', campaignTotals.sent, campaignTotals.opened, campaignTotals.clicked]],
         theme: 'grid',
         headStyles: { fillColor: [122, 18, 32] },
+        footStyles: { fillColor: [240, 230, 231], textColor: [122, 18, 32], fontStyle: 'bold' },
       });
 
       doc.save(`workmate-shield-report-${dateLabel}.pdf`);

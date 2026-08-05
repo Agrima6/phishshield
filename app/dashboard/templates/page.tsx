@@ -231,7 +231,7 @@ export default function TemplatesPage() {
           </div>
 
           <div className="flex items-center gap-1.5 w-full md:w-auto text-xs font-semibold">
-            <span className="text-slate-500 shrink-0">Payload Category:</span>
+            <span className="text-slate-500 shrink-0">Category:</span>
             <Select 
               value={categoryFilter} 
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -431,7 +431,7 @@ export default function TemplatesPage() {
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Payload Category</label>
+                <label className="block text-slate-700 mb-1">Category</label>
                 <Select
                   value={newTemp.category}
                   onChange={(e) => setNewTemp({ ...newTemp, category: e.target.value })}

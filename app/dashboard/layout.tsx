@@ -234,7 +234,7 @@ export default function DashboardLayout({
           {/* Logo header */}
           <div className="h-16 flex items-center px-6 border-b border-slate-100 justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <Image src="/workmate-shield-logo.png" alt="Workmate Shield" width={32} height={32} className="h-8 w-8 rounded-md shadow-xs shrink-0" />
+              <Image src="/workmate-shield-logo.png" alt="Workmate Shield" width={44} height={44} className="h-11 w-11 rounded-md shadow-xs shrink-0" />
               {sidebarOpen && (
                 <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
                   WORKMATE <span className="text-primary">SHIELD</span>

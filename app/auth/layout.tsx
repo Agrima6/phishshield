@@ -18,7 +18,7 @@ export default function AuthLayout({
 
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <Image src="/workmate-shield-logo.png" alt="Workmate Shield" width={40} height={40} className="h-10 w-10 rounded-lg shadow-xs" />
+            <Image src="/workmate-shield-logo.png" alt="Workmate Shield" width={56} height={56} className="h-14 w-14 rounded-lg shadow-xs" />
             <span className="font-semibold text-lg tracking-wider text-slate-100">
               WORKMATE <span className="text-primary font-bold">SHIELD</span>
             </span>

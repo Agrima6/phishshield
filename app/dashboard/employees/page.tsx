@@ -28,6 +28,7 @@ export default function EmployeesPage() {
   // Search / Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRisk, setFilterRisk] = useState<string>('all');
+  const [filterDepartment, setFilterDepartment] = useState<string>('all');
   
   // Modals
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -38,6 +39,7 @@ export default function EmployeesPage() {
   // CSV Import States
   const [fileToImport, setFileToImport] = useState<File | null>(null);
   const [importing, setImporting] = useState<boolean>(false);
+  const [dragActive, setDragActive] = useState<boolean>(false);
   const [importResult, setImportResult] = useState<any | null>(null);
 
   // New Employee Form
@@ -129,16 +131,19 @@ export default function EmployeesPage() {
   };
 
   // Filter Logic
+  const departmentOptions = Array.from(new Set(employees.map((e) => e.department).filter(Boolean))).sort();
+
   const filteredEmployees = employees.filter((emp) => {
     const nameVal = emp.name || '';
     const emailVal = emp.email || '';
     const riskVal = emp.risk_rating || emp.riskRating || 'low';
 
-    const matchesSearch = nameVal.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = nameVal.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           emailVal.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRisk = filterRisk === 'all' ? true : riskVal === filterRisk;
-    
-    return matchesSearch && matchesRisk;
+    const matchesDepartment = filterDepartment === 'all' ? true : emp.department === filterDepartment;
+
+    return matchesSearch && matchesRisk && matchesDepartment;
   });
 
   return (
@@ -174,9 +179,23 @@ export default function EmployeesPage() {
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto text-xs font-semibold">
             <div className="flex items-center gap-1.5">
               <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-500">Department:</span>
+              <Select
+                value={filterDepartment}
+                onChange={(e) => setFilterDepartment(e.target.value)}
+                className="w-36"
+              >
+                <option value="all">All departments</option>
+                {departmentOptions.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" />
               <span className="text-slate-500">Risk rating:</span>
-              <Select 
-                value={filterRisk} 
+              <Select
+                value={filterRisk}
                 onChange={(e) => setFilterRisk(e.target.value)}
                 className="w-32"
               >
@@ -350,7 +369,7 @@ export default function EmployeesPage() {
                     type="button"
                     className="text-primary hover:underline font-semibold"
                     onClick={() => {
-                      const csv = 'name,email,department,manager\nJordan Lee,jordan.lee@yourcompany.com,Engineering,Priya Shah\nSam Patel,sam.patel@yourcompany.com,Sales,Priya Shah\n';
+                      const csv = 'Name,Email,Department,Manager\nJordan Lee,jordan.lee@yourcompany.com,Engineering,Priya Shah\nSam Patel,sam.patel@yourcompany.com,Sales,Priya Shah\n';
                       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                       const url = URL.createObjectURL(blob);
                       const link = document.createElement('a');
@@ -366,10 +385,10 @@ export default function EmployeesPage() {
                 <table className="w-full text-[10px]">
                   <thead>
                     <tr className="bg-white text-slate-400 border-b border-slate-100">
-                      <th className="text-left font-semibold px-3 py-1.5">name</th>
-                      <th className="text-left font-semibold px-3 py-1.5">email</th>
-                      <th className="text-left font-semibold px-3 py-1.5">department</th>
-                      <th className="text-left font-semibold px-3 py-1.5">manager</th>
+                      <th className="text-left font-semibold px-3 py-1.5">Name</th>
+                      <th className="text-left font-semibold px-3 py-1.5">Email</th>
+                      <th className="text-left font-semibold px-3 py-1.5">Department</th>
+                      <th className="text-left font-semibold px-3 py-1.5">Manager</th>
                     </tr>
                   </thead>
                   <tbody className="text-slate-600 font-normal">
@@ -390,14 +409,24 @@ export default function EmployeesPage() {
               </div>
 
               <div
-                className="py-8 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors relative"
+                className={`py-8 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-colors relative ${
+                  dragActive ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                }`}
                 onClick={() => document.getElementById('csv-file-input')?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) setFileToImport(file);
+                }}
               >
-                <input 
-                  type="file" 
-                  id="csv-file-input" 
-                  accept=".csv" 
-                  className="hidden" 
+                <input
+                  type="file"
+                  id="csv-file-input"
+                  accept=".csv"
+                  className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) setFileToImport(file);
@@ -405,9 +434,9 @@ export default function EmployeesPage() {
                 />
                 <UploadCloud className="h-10 w-10 text-slate-400 mb-3" />
                 <span className="text-xs font-semibold text-slate-700">
-                  {fileToImport ? fileToImport.name : 'Click to select CSV Directory Sheet'}
+                  {fileToImport ? fileToImport.name : dragActive ? 'Drop the CSV file here' : 'Click to select, or drag and drop a CSV Directory Sheet'}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-1">Accepts headers: name, email, department, manager</span>
+                <span className="text-[10px] text-slate-400 mt-1">Accepts headers: Name, Email, Department, Manager</span>
               </div>
               
               <DialogFooter>
