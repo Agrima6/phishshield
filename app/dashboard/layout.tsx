@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { ChatbotWidget } from '@/components/chatbot-widget';
 import { useRouter, usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
@@ -559,6 +560,8 @@ export default function DashboardLayout({
           </div>
         </div>
       )}
+
+      <ChatbotWidget />
 
     </div>
   );

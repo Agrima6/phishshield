@@ -457,4 +457,13 @@ export const api = {
       body: formData,
     });
   },
+
+  chatbot: {
+    sendMessage: async (message: string, history: { role: 'user' | 'model'; text: string }[]) => {
+      return fetcher<{ reply: string; error_detail?: string }>('/api/chatbot/message', {
+        method: 'POST',
+        body: JSON.stringify({ message, history }),
+      });
+    },
+  },
 };
