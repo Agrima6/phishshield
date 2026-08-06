@@ -1,12 +1,18 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send } from 'lucide-react';
-import { api } from '@/lib/api';
+import { X, Search, ArrowLeft, Mail } from 'lucide-react';
+import { KNOWLEDGE_BASE, KBCategory, searchKnowledgeBase, SUPPORT_EMAIL } from '@/lib/support-kb';
 
-interface ChatMessage {
-  role: 'user' | 'model';
+interface TranscriptEntry {
+  role: 'user' | 'bot';
   text: string;
+}
+
+interface Option {
+  label: string;
+  onClick: () => void;
+  href?: string;
 }
 
 function RobotAvatar({ className = '' }: { className?: string }) {
@@ -25,35 +31,93 @@ function RobotAvatar({ className = '' }: { className?: string }) {
   );
 }
 
+const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Workmate Shield support request')}`;
+
 export function ChatbotWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: "Hi, I'm Shieldy! 🛡️ Ask me anything about running campaigns, the employee directory, or reading your risk analytics." },
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([
+    { role: 'bot', text: "Hi, I'm Shieldy! 🤖 Pick a topic below and I'll dig in with you." },
   ]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
+  const [options, setOptions] = useState<Option[]>([]);
+  const [thinking, setThinking] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, open]);
+  }, [transcript, options, thinking, open]);
 
-  const handleSend = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const text = input.trim();
-    if (!text || sending) return;
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', text }];
-    setMessages(nextMessages);
-    setInput('');
-    setSending(true);
-    try {
-      const res = await api.chatbot.sendMessage(text, nextMessages);
-      setMessages((prev) => [...prev, { role: 'model', text: res.reply }]);
-    } catch (err: any) {
-      setMessages((prev) => [...prev, { role: 'model', text: "I couldn't reach the server just now — try again in a bit! 🛡️" }]);
-    } finally {
-      setSending(false);
+  // Seed the root menu once, after the opening greeting above.
+  useEffect(() => {
+    setOptions(rootOptions());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const say = (userChoice: string | null, botReply: string, nextOptions: Option[]) => {
+    setOptions([]);
+    if (userChoice) {
+      setTranscript((prev) => [...prev, { role: 'user', text: userChoice }]);
     }
+    setThinking(true);
+    window.setTimeout(() => {
+      setTranscript((prev) => [...prev, { role: 'bot', text: botReply }]);
+      setThinking(false);
+      setOptions(nextOptions);
+    }, 350);
+  };
+
+  const rootOptions = (): Option[] => [
+    ...KNOWLEDGE_BASE.map((cat) => ({ label: cat.label, onClick: () => openCategory(cat) })),
+    { label: "Something else / talk to a human", onClick: goToContact },
+  ];
+
+  const openCategory = (cat: KBCategory) => {
+    say(cat.label, `Here are common questions about ${cat.label}:`, [
+      ...cat.entries.map((entry) => ({ label: entry.q, onClick: () => openAnswer(cat, entry.q, entry.a) })),
+      { label: '⬅ None of these, go back', onClick: goToRoot },
+    ]);
+  };
+
+  const openAnswer = (cat: KBCategory, question: string, answer: string) => {
+    say(question, answer, [
+      { label: '✅ That solved it', onClick: onResolved },
+      { label: '❌ Still need help', onClick: goToContact },
+      { label: `⬅ Back to ${cat.label}`, onClick: () => openCategory(cat) },
+    ]);
+  };
+
+  const onResolved = () => {
+    say('✅ That solved it', 'Glad I could help! Anything else you want to look into?', rootOptions());
+  };
+
+  const goToRoot = () => {
+    say(null, 'What do you need help with?', rootOptions());
+  };
+
+  const goToContact = () => {
+    say('❌ Still need help', `No problem, our support team can take it from here. Reach us any time at ${SUPPORT_EMAIL} and we'll get back to you.`, [
+      { label: `📧 Email ${SUPPORT_EMAIL}`, href: SUPPORT_MAILTO, onClick: () => {} },
+      { label: '⬅ Back to main menu', onClick: goToRoot },
+    ]);
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = searchValue.trim();
+    if (!query) return;
+    setSearchValue('');
+    const results = searchKnowledgeBase(query);
+    if (results.length === 0) {
+      say(query, "I couldn't find anything about that in my help topics. Want me to loop in support?", [
+        { label: `📧 Email ${SUPPORT_EMAIL}`, href: SUPPORT_MAILTO, onClick: () => {} },
+        { label: '⬅ Back to main menu', onClick: goToRoot },
+      ]);
+      return;
+    }
+    say(query, "Here's what I found:", [
+      ...results.map((r) => ({ label: r.entry.q, onClick: () => openAnswer(r.category, r.entry.q, r.entry.a) })),
+      { label: '⬅ None of these, go back', onClick: goToRoot },
+    ]);
   };
 
   return (
@@ -92,7 +156,7 @@ export function ChatbotWidget() {
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3.5 py-4 space-y-3 bg-slate-50">
-            {messages.map((m, i) => (
+            {transcript.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
@@ -105,7 +169,7 @@ export function ChatbotWidget() {
                 </div>
               </div>
             ))}
-            {sending && (
+            {thinking && (
               <div className="flex justify-start">
                 <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-slate-300 animate-bounce [animation-delay:-0.3s]" />
@@ -114,23 +178,57 @@ export function ChatbotWidget() {
                 </div>
               </div>
             )}
+            {!thinking && options.length > 0 && (
+              <div className="flex flex-col items-start gap-1.5 pt-1">
+                {options.map((opt, i) =>
+                  opt.href ? (
+                    <a
+                      key={i}
+                      href={opt.href}
+                      onClick={opt.onClick}
+                      className="text-left text-xs font-semibold px-3 py-2 rounded-xl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors flex items-center gap-1.5"
+                    >
+                      <Mail className="h-3.5 w-3.5 shrink-0" /> {opt.label}
+                    </a>
+                  ) : (
+                    <button
+                      key={i}
+                      onClick={opt.onClick}
+                      className="text-left text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-primary hover:text-primary transition-colors"
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Input */}
-          <form onSubmit={handleSend} className="p-3 border-t border-slate-100 flex items-center gap-2 shrink-0 bg-white">
+          {/* Search */}
+          <form onSubmit={handleSearch} className="p-3 border-t border-slate-100 flex items-center gap-2 shrink-0 bg-white">
+            {transcript.length > 1 && (
+              <button
+                type="button"
+                onClick={goToRoot}
+                aria-label="Back to main menu"
+                className="h-9 w-9 shrink-0 rounded-full border border-slate-200 text-slate-400 hover:text-primary hover:border-primary flex items-center justify-center transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            )}
             <input
               type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Shieldy something..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              placeholder="Or search a topic..."
               className="flex-1 text-xs px-3.5 py-2.5 rounded-full border border-slate-200 outline-none focus:border-primary transition-colors"
             />
             <button
               type="submit"
-              disabled={sending || !input.trim()}
+              disabled={!searchValue.trim()}
               className="h-9 w-9 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary-hover transition-colors"
             >
-              <Send className="h-4 w-4" />
+              <Search className="h-4 w-4" />
             </button>
           </form>
         </div>
