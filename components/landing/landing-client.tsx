@@ -78,7 +78,7 @@ export default function LandingClient() {
 
       {/* Hero */}
       <section className="relative overflow-hidden bg-white">
-        <DotGrid className="opacity-90" />
+        <DotGrid />
         <div className="pointer-events-none absolute -top-32 -left-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl animate-[floatSlow_12s_ease-in-out_infinite]" />
         <div className="pointer-events-none absolute top-1/3 -right-24 h-80 w-80 rounded-full bg-rose-300/20 blur-3xl animate-[floatSlow_15s_ease-in-out_infinite_1s]" />
 
@@ -141,15 +141,15 @@ export default function LandingClient() {
 
       {/* Threat is real */}
       <section className="bg-slate-50 border-y border-slate-100">
-        <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-12 items-center">
-          <Reveal>
-            <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-xl aspect-video bg-black">
+        <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-12 items-stretch">
+          <Reveal className="h-full">
+            <div className="relative h-full min-h-[320px] rounded-2xl overflow-hidden border border-slate-200 shadow-xl bg-black">
               <video
                 autoPlay
                 muted
                 loop
                 playsInline
-                className="w-full h-full object-cover opacity-90"
+                className="absolute inset-0 w-full h-full object-cover opacity-90"
                 src="/videos/threat-terminal.mp4"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -158,8 +158,8 @@ export default function LandingClient() {
               </div>
             </div>
           </Reveal>
-          <Reveal delay={100}>
-            <div>
+          <Reveal delay={100} className="h-full">
+            <div className="h-full flex flex-col justify-center">
               <h2 className="text-3xl font-bold tracking-tight mb-4">The threat isn&apos;t hypothetical.</h2>
               <p className="text-slate-600 leading-relaxed mb-8">
                 Phishing is still the number one way attackers get into an organization. One convincing
@@ -229,7 +229,7 @@ export default function LandingClient() {
 
       {/* CTA */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#3a0a10] via-[#5c0f18] to-[#7a1220] text-white">
-        <DotGrid dotColor="rgba(255,255,255,0.25)" className="opacity-60" />
+        <DotGrid dotColor="rgba(255,255,255,0.4)" />
         <Reveal className="relative z-10">
           <div className="max-w-4xl mx-auto px-6 py-20 text-center">
             <GraduationCap className="h-10 w-10 text-rose-200 mx-auto mb-4 animate-[floatSlow_4s_ease-in-out_infinite]" />

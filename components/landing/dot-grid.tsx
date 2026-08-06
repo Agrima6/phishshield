@@ -13,7 +13,7 @@ interface DotGridProps {
 
 export function DotGrid({
   className = '',
-  dotColor = 'rgba(122, 18, 32, 0.4)',
+  dotColor = 'rgba(122, 18, 32, 0.55)',
   spacing = 30,
   maxOffset = 16,
   radius = 150,
@@ -33,7 +33,7 @@ export function DotGrid({
     let height = 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const mouse = { x: -9999, y: -9999 };
-    let dots: { ox: number; oy: number; x: number; y: number }[] = [];
+    let dots: { ox: number; oy: number; x: number; y: number; alpha: number }[] = [];
 
     const buildGrid = () => {
       width = parent.clientWidth;
@@ -46,12 +46,12 @@ export function DotGrid({
       ctx.scale(dpr, dpr);
       const cols = Math.ceil(width / spacing) + 1;
       const rows = Math.ceil(height / spacing) + 1;
-      const list: { ox: number; oy: number; x: number; y: number }[] = [];
+      const list: { ox: number; oy: number; x: number; y: number; alpha: number }[] = [];
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const x = c * spacing;
           const y = r * spacing;
-          list.push({ ox: x, oy: y, x, y });
+          list.push({ ox: x, oy: y, x, y, alpha: 0 });
         }
       }
       dots = list;
@@ -67,6 +67,8 @@ export function DotGrid({
       mouse.y = -9999;
     };
 
+    const fadeRadius = radius * 1.4;
+
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
       for (const d of dots) {
@@ -76,20 +78,29 @@ export function DotGrid({
         let tx = d.ox;
         let ty = d.oy;
         let sizeBoost = 0;
+        let targetAlpha = 0;
         if (dist < radius) {
-          const force = (1 - dist / radius) * maxOffset;
+          const t = 1 - dist / radius;
+          const force = t * maxOffset;
           const angle = Math.atan2(dy, dx);
           tx = d.ox + Math.cos(angle) * force;
           ty = d.oy + Math.sin(angle) * force;
-          sizeBoost = (1 - dist / radius) * 1.8;
+          sizeBoost = t * 1.8;
+          targetAlpha = 1;
+        } else if (dist < fadeRadius) {
+          targetAlpha = 1 - (dist - radius) / (fadeRadius - radius);
         }
         d.x += (tx - d.x) * 0.16;
         d.y += (ty - d.y) * 0.16;
+        d.alpha += (targetAlpha - d.alpha) * 0.12;
+        if (d.alpha < 0.02) continue;
         ctx.beginPath();
         ctx.arc(d.x, d.y, baseRadius + sizeBoost, 0, Math.PI * 2);
+        ctx.globalAlpha = d.alpha;
         ctx.fillStyle = dotColor;
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
       raf = requestAnimationFrame(draw);
     };
 
