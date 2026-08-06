@@ -1,24 +1,33 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Send, 
-  Eye, 
-  MousePointerClick, 
-  TrendingUp, 
-  TrendingDown, 
-  ShieldCheck, 
+import {
+  Send,
+  Eye,
+  MousePointerClick,
+  TrendingUp,
+  TrendingDown,
+  ShieldCheck,
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { PageBanner } from '@/components/dashboard/page-banner';
 import { api } from '@/lib/api';
 import { useSession } from '@/hooks/use-session';
 import Link from 'next/link';
 import { toast } from 'sonner';
+
+function riskColor(rate: number) {
+  if (rate >= 15) return '#ef4444';
+  if (rate >= 8) return '#f97316';
+  if (rate >= 3) return '#f59e0b';
+  return '#22c55e';
+}
 
 function greetingForHour(hour: number): string {
   if (hour < 12) return 'Good morning';
@@ -102,34 +111,41 @@ export default function OverviewPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          {friendlyName && (
-            <p className="text-sm font-semibold text-primary mb-1">{greeting}, {friendlyName}</p>
-          )}
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-sans">Overview Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time simulation metrics, compliance scores, and human risk telemetry.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadData}>
-            Refresh telemetry
-          </Button>
-          <Link href="/dashboard/campaigns">
-            <Button size="sm">
-              New Simulation
+      <PageBanner
+        title="Overview Dashboard"
+        description="Real-time simulation metrics, compliance scores, and human risk telemetry."
+        eyebrow={
+          friendlyName ? (
+            <p className="text-sm font-semibold text-rose-200 mb-1">{greeting}, {friendlyName}</p>
+          ) : undefined
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadData}
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+            >
+              Refresh telemetry
             </Button>
-          </Link>
-        </div>
-      </div>
+            <Link href="/dashboard/campaigns">
+              <Button size="sm" className="bg-white text-primary hover:bg-white/90">
+                New Simulation
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total emails sent */}
-        <Card>
+        <Card className="group transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Simulated Emails</span>
-              <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <Send className="h-4 w-4" />
               </div>
             </div>
@@ -144,11 +160,11 @@ export default function OverviewPage() {
         </Card>
 
         {/* Card 2: Open Rate */}
-        <Card>
+        <Card className="group transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Open Rate</span>
-              <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <Eye className="h-4 w-4" />
               </div>
             </div>
@@ -162,11 +178,11 @@ export default function OverviewPage() {
         </Card>
 
         {/* Card 3: Click Rate */}
-        <Card>
+        <Card className="group transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Average Click Rate</span>
-              <div className="p-2 rounded-lg bg-red-50 text-red-600">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-primary-hover text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <MousePointerClick className="h-4 w-4" />
               </div>
             </div>
@@ -181,11 +197,11 @@ export default function OverviewPage() {
         </Card>
 
         {/* Card 4: High Risk Employees */}
-        <Card>
+        <Card className="group transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">High Risk Employees</span>
-              <div className="p-2 rounded-lg bg-red-50 text-red-600">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <AlertTriangle className="h-4 w-4" />
               </div>
             </div>
@@ -212,27 +228,34 @@ export default function OverviewPage() {
             <CardContent>
               {departmentRates.length === 0 ? (
                 <p className="text-xs text-slate-400 py-6 text-center">
-                  No department click-rate data yet — this fills in once employees with a department have appeared in a sent campaign.
+                  No department click-rate data yet, this fills in once employees with a department have appeared in a sent campaign.
                 </p>
               ) : (
-                <div className="space-y-4 pt-2">
-                  {departmentRates.map((item) => {
-                    const color = item.rate >= 15 ? 'bg-red-500' : item.rate >= 8 ? 'bg-orange-500' : item.rate >= 3 ? 'bg-amber-500' : 'bg-green-500';
-                    return (
-                      <div key={item.department} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs font-semibold">
-                          <span className="text-slate-600">{item.department}</span>
-                          <span className="text-slate-900">{item.rate}% clicks</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${color}`}
-                            style={{ width: `${Math.min(item.rate, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="h-64 pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={departmentRates} layout="vertical" margin={{ left: 8, right: 24 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" unit="%" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="department"
+                        width={100}
+                        tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        cursor={{ fill: '#f8fafc' }}
+                        formatter={(value: any) => [`${value}%`, 'Click rate']}
+                        contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
+                      />
+                      <Bar dataKey="rate" radius={[0, 6, 6, 0]} maxBarSize={22} animationDuration={700}>
+                        {departmentRates.map((item, idx) => (
+                          <Cell key={idx} fill={riskColor(item.rate)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               )}
             </CardContent>
@@ -333,7 +356,7 @@ export default function OverviewPage() {
             <CardContent className="space-y-3">
               {recentEvents.length === 0 ? (
                 <p className="text-xs text-slate-400 py-6 text-center">
-                  No opens or clicks recorded yet — this fills in once recipients interact with a sent campaign.
+                  No opens or clicks recorded yet, this fills in once recipients interact with a sent campaign.
                 </p>
               ) : (
                 recentEvents.map((log, idx) => (

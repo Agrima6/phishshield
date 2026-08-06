@@ -1,23 +1,36 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart3, 
-  Download, 
-  FileSpreadsheet, 
-  FileText, 
-  Mail, 
-  TrendingDown, 
-  TrendingUp, 
-  UserX 
+import {
+  FileSpreadsheet,
+  FileText,
+  TrendingUp,
 } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  RadialBarChart, RadialBar, PolarAngleAxis,
+  AreaChart, Area,
+} from 'recharts';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { PageBanner } from '@/components/dashboard/page-banner';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
+function riskColor(rate: number) {
+  if (rate > 25) return '#ef4444';
+  if (rate > 10) return '#f59e0b';
+  return '#22c55e';
+}
+
+function scoreColor(score: number) {
+  if (score >= 80) return '#22c55e';
+  if (score >= 60) return '#f59e0b';
+  return '#ef4444';
+}
 
 async function loadImageAsDataUrl(url: string): Promise<string | null> {
   try {
@@ -221,28 +234,45 @@ export default function ReportsPage() {
         risk = 'Medium';
         color = 'text-amber-500 font-semibold';
       }
-      return { dept, count: data.count, runs: data.runs, clicks: data.clicks, risk, color };
+      return { dept, count: data.count, runs: data.runs, clicks: data.clicks, risk, color, ratePct: Math.round(rate * 100) };
     });
   };
 
   const deptStats = getDeptStats();
 
+  const campaignTrend = campaigns.map((c) => ({
+    name: c.name?.length > 14 ? `${c.name.slice(0, 14)}…` : c.name,
+    sent: c.sentCount || c.sent_count || 0,
+    opened: c.openedCount || c.opened_count || 0,
+    clicked: c.clickedCount || c.clicked_count || 0,
+  }));
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-sans">Reports & Analytics</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Aggregate human risk dashboards, click-through tables, and compliance PDF exports.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => handleExportReport('csv')} className="flex items-center gap-1">
-            <FileSpreadsheet className="h-4 w-4" /> Export CSV
-          </Button>
-          <Button size="sm" onClick={() => handleExportReport('pdf')} className="flex items-center gap-1">
-            <FileText className="h-4 w-4" /> Export PDF Report
-          </Button>
-        </div>
-      </div>
+      <PageBanner
+        title="Reports & Analytics"
+        description="Aggregate human risk dashboards, click-through tables, and compliance PDF exports."
+        video="/videos/analytics-bg.mp4"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportReport('csv')}
+              className="flex items-center gap-1 bg-white/10 text-white border-white/20 hover:bg-white/20"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Export CSV
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleExportReport('pdf')}
+              className="flex items-center gap-1 bg-white text-primary hover:bg-white/90"
+            >
+              <FileText className="h-4 w-4" /> Export PDF Report
+            </Button>
+          </>
+        }
+      />
 
       {loading ? (
         <div className="text-center py-20 text-slate-400 text-xs">
@@ -260,10 +290,27 @@ export default function ReportsPage() {
                 <CardDescription>Overall department vulnerability rating</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="text-center p-6 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-5xl font-bold text-slate-900">{vigilanceScore}%</span>
-                  <p className="text-xs text-slate-500 font-semibold mt-1">Average Vigilance Score</p>
-                  <div className="inline-flex items-center gap-1 text-[10px] text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded-full mt-3">
+                <div className="relative p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="relative h-40 w-40 mx-auto">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart
+                        innerRadius="72%"
+                        outerRadius="100%"
+                        barSize={12}
+                        data={[{ value: vigilanceScore, fill: scoreColor(vigilanceScore) }]}
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+                        <RadialBar background={{ fill: '#e2e8f0' }} dataKey="value" cornerRadius={8} animationDuration={800} />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-bold text-slate-900">{vigilanceScore}%</span>
+                      <span className="text-[10px] text-slate-500 font-semibold">Vigilance</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-1 text-[10px] text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded-full mt-3 mx-auto w-fit">
                     <TrendingUp className="h-3 w-3" />
                     <span>Based on {campaigns.length} campaigns</span>
                   </div>
@@ -293,6 +340,27 @@ export default function ReportsPage() {
                 <CardDescription>Individual metrics segmented by corporate sector</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                {deptStats.length > 0 && (
+                  <div className="h-48 px-4 pt-2 pb-4 border-b border-slate-100">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={deptStats} margin={{ left: -20, right: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="dept" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                        <YAxis unit="%" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          cursor={{ fill: '#f8fafc' }}
+                          formatter={(value: any) => [`${value}%`, 'Click rate']}
+                          contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
+                        />
+                        <Bar dataKey="ratePct" radius={[6, 6, 0, 0]} maxBarSize={40} animationDuration={700}>
+                          {deptStats.map((item, idx) => (
+                            <Cell key={idx} fill={riskColor(item.ratePct)} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -326,6 +394,40 @@ export default function ReportsPage() {
             </Card>
 
           </div>
+
+          {/* Campaign performance trend */}
+          {campaignTrend.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Campaign performance trend</CardTitle>
+                <CardDescription>Sent, opened, and clicked volume across all campaigns</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={campaignTrend} margin={{ left: -20, right: 8 }}>
+                      <defs>
+                        <linearGradient id="sentGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#7a1220" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#7a1220" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="clickedGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ef4444" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                      <Area type="monotone" dataKey="sent" stroke="#7a1220" strokeWidth={2} fill="url(#sentGradient)" name="Sent" />
+                      <Area type="monotone" dataKey="clicked" stroke="#ef4444" strokeWidth={2} fill="url(#clickedGradient)" name="Clicked" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Historical Simulation Run Performance */}
           <Card>
