@@ -19,10 +19,10 @@ export default function AuthLayout({
           muted
           loop
           playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
+          className="absolute inset-0 w-full h-full object-cover opacity-80"
           src="/videos/threat-terminal.mp4"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1c0507]/95 via-[#1c0507]/85 to-[#1c0507]/95" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1c0507]/70 via-[#1c0507]/55 to-[#1c0507]/75" />
         <DotGrid dotColor="rgba(255,255,255,0.35)" />
 
         <div className="relative z-10">
