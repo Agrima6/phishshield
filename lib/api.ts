@@ -318,6 +318,7 @@ export const api = {
       },
       create: async (data: {
         company_name: string;
+        contact_name?: string;
         contact_email: string;
         admin_email: string;
         contact_mobile?: string;
@@ -362,6 +363,7 @@ export const api = {
     create: async (data: {
       name: string;
       category: string;
+      theme?: string;
       subject: string;
       body: string;
       description?: string;

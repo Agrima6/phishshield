@@ -1,12 +1,28 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
+import { X, Send } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+}
+
+function RobotAvatar({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <line x1="24" y1="5" x2="24" y2="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="24" cy="4" r="2.5" fill="currentColor" />
+      <rect x="8" y="11" width="32" height="28" rx="12" fill="currentColor" fillOpacity="0.18" />
+      <rect x="8" y="11" width="32" height="28" rx="12" stroke="currentColor" strokeWidth="2.5" />
+      <circle cx="7" cy="25" r="3" fill="currentColor" />
+      <circle cx="41" cy="25" r="3" fill="currentColor" />
+      <circle cx="18" cy="25" r="3.4" fill="currentColor" />
+      <circle cx="30" cy="25" r="3.4" fill="currentColor" />
+      <path d="M18 32c1.8 2 4.2 3 6 3s4.2-1 6-3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+    </svg>
+  );
 }
 
 export function ChatbotWidget() {
@@ -49,7 +65,7 @@ export function ChatbotWidget() {
           aria-label="Open Shieldy chat assistant"
           className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200 animate-[bounce_3s_ease-in-out_infinite]"
         >
-          <MessageCircle className="h-6 w-6" />
+          <RobotAvatar className="h-8 w-8" />
           <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-success border-2 border-white" />
         </button>
       )}
@@ -61,7 +77,7 @@ export function ChatbotWidget() {
           <div className="bg-primary text-primary-foreground px-4 py-3.5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-full bg-white/15 flex items-center justify-center relative">
-                <Sparkles className="h-4.5 w-4.5" />
+                <RobotAvatar className="h-6 w-6" />
                 <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-success border-2 border-primary" />
               </div>
               <div>

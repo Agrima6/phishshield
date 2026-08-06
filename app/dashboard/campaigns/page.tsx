@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Send, 
-  Plus, 
-  Mail, 
-  User, 
-  Globe, 
-  Settings, 
+import {
+  Send,
+  Plus,
+  Mail,
+  User,
+  Globe,
+  Settings,
   Trash2,
   CheckCircle2,
   AlertTriangle,
@@ -15,8 +15,10 @@ import {
   RefreshCw,
   Eye,
   Clock,
-  XCircle
+  XCircle,
+  BarChart3
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,6 +55,10 @@ export default function CampaignsPage() {
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
+
+  const [reportCampaign, setReportCampaign] = useState<any | null>(null);
+  const [reportRecipients, setReportRecipients] = useState<any[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
@@ -161,6 +167,20 @@ export default function CampaignsPage() {
       toast.error('Failed to launch campaign: ' + err.message);
     } finally {
       setLaunchingId(null);
+    }
+  };
+
+  const openCampaignReport = async (camp: any) => {
+    setReportCampaign(camp);
+    setReportLoading(true);
+    try {
+      const recipients = await api.recipients.list(camp._id || camp.id);
+      setReportRecipients(recipients);
+    } catch (err: any) {
+      toast.error('Failed to load campaign report: ' + err.message);
+      setReportRecipients([]);
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -317,6 +337,15 @@ export default function CampaignsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-primary"
+                            onClick={() => openCampaignReport(camp)}
+                            title="View campaign report"
+                          >
+                            <BarChart3 className="h-4 w-4" />
+                          </Button>
                           {camp.status === 'draft' && (
                             <>
                               <Button
@@ -652,6 +681,116 @@ export default function CampaignsPage() {
             </Button>
             <Button size="sm" onClick={handleConfirmSchedule} loading={scheduling} disabled={!scheduleDateTime}>
               Confirm Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Campaign Report Dialog */}
+      <Dialog open={!!reportCampaign} onOpenChange={(open) => !open && setReportCampaign(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{reportCampaign?.name}</DialogTitle>
+            <DialogDescription>{reportCampaign?.subject}</DialogDescription>
+          </DialogHeader>
+          {reportCampaign && (() => {
+            const sent = reportCampaign.sentCount || reportCampaign.sent_count || 0;
+            const opened = reportCampaign.openedCount || reportCampaign.opened_count || 0;
+            const clicked = reportCampaign.clickedCount || reportCampaign.clicked_count || 0;
+            const funnel = [
+              { stage: 'Sent', value: sent, fill: '#7a1220' },
+              { stage: 'Opened', value: opened, fill: '#f59e0b' },
+              { stage: 'Clicked', value: clicked, fill: '#ef4444' },
+            ];
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-xl font-bold text-slate-900">{sent}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Sent</div>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-xl font-bold text-amber-600">{opened}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Opened</div>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-xl font-bold text-destructive">{clicked}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Clicked</div>
+                  </div>
+                </div>
+
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={funnel} layout="vertical" margin={{ left: 8, right: 24 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="stage" width={60} tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                      <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={22} animationDuration={600}>
+                        {funnel.map((item, idx) => (
+                          <Cell key={idx} fill={item.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 mb-2">Recipient breakdown</h4>
+                  <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Recipient</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Opened</TableHead>
+                          <TableHead>Clicked</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-6 text-slate-400 text-xs">
+                              Loading recipients...
+                            </TableCell>
+                          </TableRow>
+                        ) : reportRecipients.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-6 text-slate-400 text-xs">
+                              No recipients on this campaign.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          reportRecipients.map((r: any, idx: number) => (
+                            <TableRow key={r._id || r.id || idx}>
+                              <TableCell>
+                                <div className="font-semibold text-slate-800">{r.name || r.email}</div>
+                                <div className="text-[10px] text-slate-400">{r.email}</div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={r.status === 'clicked' ? 'danger' : r.status === 'opened' ? 'warning' : 'secondary'}>
+                                  {r.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-slate-500">
+                                {r.opened_at ? new Date(r.opened_at).toLocaleString() : '-'}
+                              </TableCell>
+                              <TableCell className="text-xs text-slate-500">
+                                {r.clicked_at ? new Date(r.clicked_at).toLocaleString() : '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button size="sm" onClick={() => setReportCampaign(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -14,13 +14,17 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+
+const PAGE_SIZE = 20;
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const loadLogs = async () => {
     setLoading(true);
@@ -37,6 +41,10 @@ export default function AuditLogsPage() {
   useEffect(() => {
     loadLogs();
   }, []);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchTerm, categoryFilter]);
 
   const handleRefresh = () => {
     loadLogs();
@@ -126,7 +134,7 @@ export default function AuditLogsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredLogs.slice(0, 5).map((log) => {
+              ) : filteredLogs.slice(0, visibleCount).map((log) => {
                 const idVal = log._id || log.id;
                 const ipVal = log.ipAddress || log.ip_address || '127.0.0.1';
                 const timeVal = log.timestamp || new Date().toISOString();
@@ -164,6 +172,22 @@ export default function AuditLogsPage() {
               )}
             </TableBody>
           </Table>
+          {!loading && filteredLogs.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
+              <span>
+                Showing {Math.min(visibleCount, filteredLogs.length)} of {filteredLogs.length} log{filteredLogs.length === 1 ? '' : 's'}
+              </span>
+              {visibleCount < filteredLogs.length && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+                >
+                  Load more
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

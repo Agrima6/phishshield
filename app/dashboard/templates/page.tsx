@@ -24,10 +24,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from 'sonner';
 import Link from 'next/link';
 
+const THEME_OPTIONS = [
+  'IT & Security',
+  'Finance & Payroll',
+  'HR & Benefits',
+  'Productivity & Collaboration',
+  'Shipping & Delivery',
+  'Seasonal & Awareness',
+];
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [themeFilter, setThemeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modals
@@ -48,6 +58,7 @@ export default function TemplatesPage() {
   const [newTemp, setNewTemp] = useState({
     name: '',
     category: 'credential-harvester',
+    theme: THEME_OPTIONS[0],
     subject: '',
     body: '',
     description: '',
@@ -105,6 +116,7 @@ export default function TemplatesPage() {
       setNewTemp({
         name: `${aiOccasion} Security Awareness`,
         category: 'link-click',
+        theme: 'Seasonal & Awareness',
         subject: result.subject || '',
         body: result.body || '',
         description: `Gemini AI-generated awareness template for ${aiOccasion}.`,
@@ -135,6 +147,7 @@ export default function TemplatesPage() {
       await api.templates.create({
         name: newTemp.name,
         category: newTemp.category,
+        theme: newTemp.theme,
         subject: newTemp.subject,
         body: newTemp.body,
         description: newTemp.description,
@@ -143,7 +156,7 @@ export default function TemplatesPage() {
 
       toast.success(`Simulation Template "${newTemp.name}" created successfully.`);
       setCreateOpen(false);
-      setNewTemp({ name: '', category: 'credential-harvester', subject: '', body: '', description: '', thumbnail: '' });
+      setNewTemp({ name: '', category: 'credential-harvester', theme: THEME_OPTIONS[0], subject: '', body: '', description: '', thumbnail: '' });
       setImagePreview('');
       loadTemplates();
     } catch (err: any) {
@@ -180,10 +193,11 @@ export default function TemplatesPage() {
   };
 
   const filteredTemplates = templates.filter((t) => {
-    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           t.subject.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === 'all' ? true : t.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const matchesTheme = themeFilter === 'all' ? true : t.theme === themeFilter;
+    return matchesSearch && matchesCategory && matchesTheme;
   });
 
   const getThumbnailElement = (thumbnail: string) => {
@@ -231,13 +245,27 @@ export default function TemplatesPage() {
           </div>
 
           <div className="flex items-center gap-1.5 w-full md:w-auto text-xs font-semibold">
-            <span className="text-slate-500 shrink-0">Category:</span>
-            <Select 
-              value={categoryFilter} 
+            <span className="text-slate-500 shrink-0">Theme:</span>
+            <Select
+              value={themeFilter}
+              onChange={(e) => setThemeFilter(e.target.value)}
+              className="w-48"
+            >
+              <option value="all">All themes</option>
+              {THEME_OPTIONS.map((theme) => (
+                <option key={theme} value={theme}>{theme}</option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-1.5 w-full md:w-auto text-xs font-semibold">
+            <span className="text-slate-500 shrink-0">Delivery Type:</span>
+            <Select
+              value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="w-48"
             >
-              <option value="all">All categories</option>
+              <option value="all">All types</option>
               <option value="credential-harvester">Credential Harvester</option>
               <option value="link-click">Link Click</option>
               <option value="malicious-attachment">Malicious Attachment</option>
@@ -277,6 +305,11 @@ export default function TemplatesPage() {
                   </div>
                 </div>
                 <CardTitle className="text-sm font-bold text-slate-800 mt-2 truncate">{temp.name}</CardTitle>
+                {temp.theme && (
+                  <span className="inline-block w-fit text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full mt-1">
+                    {temp.theme}
+                  </span>
+                )}
                 <CardDescription className="text-xs mt-1 text-slate-500 line-clamp-2 h-8 leading-relaxed">
                   {temp.description}
                 </CardDescription>
@@ -431,7 +464,7 @@ export default function TemplatesPage() {
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Category</label>
+                <label className="block text-slate-700 mb-1">Delivery Type</label>
                 <Select
                   value={newTemp.category}
                   onChange={(e) => setNewTemp({ ...newTemp, category: e.target.value })}
@@ -441,6 +474,18 @@ export default function TemplatesPage() {
                   <option value="malicious-attachment">Malicious Attachment</option>
                 </Select>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Theme</label>
+              <Select
+                value={newTemp.theme}
+                onChange={(e) => setNewTemp({ ...newTemp, theme: e.target.value })}
+              >
+                {THEME_OPTIONS.map((theme) => (
+                  <option key={theme} value={theme}>{theme}</option>
+                ))}
+              </Select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">

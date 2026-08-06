@@ -10,11 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { ShieldCheck, Building, Plus, Mail, Phone, Briefcase, ShieldAlert, Calendar, Send, Users, UserPlus, Trash2, Pencil } from 'lucide-react';
+import { ShieldCheck, Building, Plus, Mail, Phone, Briefcase, ShieldAlert, Calendar, Send, Users, UserPlus, Trash2, Pencil, User } from 'lucide-react';
 
 interface TenantRow {
   id: string;
   company_name: string;
+  contact_name: string;
   contact_email: string;
   contact_mobile: string;
   designation: string;
@@ -34,6 +35,7 @@ interface AllowlistEntry {
 
 const emptyForm = {
   company_name: '',
+  contact_name: '',
   contact_email: '',
   contact_mobile: '',
   designation: '',
@@ -130,7 +132,7 @@ export default function SuperAdminPage() {
       if (result.invite_warning) {
         toast.warning(result.invite_warning);
       } else {
-        toast.success(`${formData.company_name} onboarded — an invite was sent to ${formData.admin_email}.`);
+        toast.success(`${formData.company_name} onboarded. An invite was sent to ${formData.admin_email}.`);
       }
       setFormData(emptyForm);
       loadTenants();
@@ -145,6 +147,7 @@ export default function SuperAdminPage() {
     setEditTarget(t);
     setEditForm({
       company_name: t.company_name,
+      contact_name: t.contact_name || '',
       contact_email: t.contact_email,
       contact_mobile: t.contact_mobile || '',
       designation: t.designation || '',
@@ -213,7 +216,7 @@ export default function SuperAdminPage() {
             <UserPlus className="h-4 w-4 text-primary" /> Authorized Sign-Up Emails
           </CardTitle>
           <CardDescription className="text-xs">
-            Public sign-up is disabled — only emails added here can create an account. Add a colleague&apos;s
+            Public sign-up is disabled, only emails added here can create an account. Add a colleague&apos;s
             work email below, and they&apos;ll be able to register themselves at the sign-up page.
           </CardDescription>
         </CardHeader>
@@ -241,7 +244,7 @@ export default function SuperAdminPage() {
               Loading authorized emails...
             </div>
           ) : allowlist.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">No emails authorized yet — add one above to let them sign up.</p>
+            <p className="text-xs text-slate-400 py-4 text-center">No emails authorized yet. Add one above to let them sign up.</p>
           ) : (
             <div className="space-y-2">
               {allowlist.map((entry) => (
@@ -257,20 +260,19 @@ export default function SuperAdminPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-
-        {/* Onboarding Form */}
-        <Card className="xl:col-span-1 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Building className="h-4 w-4 text-primary" /> Onboard New Company
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Creates a fully isolated data partition for this company and invites their first admin by email.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleOnboard} className="space-y-4 text-xs font-semibold">
+      {/* Onboarding Form */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <Building className="h-4 w-4 text-primary" /> Onboard New Company
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Creates a fully isolated data partition for this company and invites their first admin by email.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleOnboard} className="text-xs font-semibold">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div>
                 <label className="block text-slate-700 mb-1">Company Name</label>
                 <div className="relative">
@@ -281,6 +283,19 @@ export default function SuperAdminPage() {
                     className="pl-9"
                     value={formData.company_name}
                     onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Contact Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    placeholder="e.g. Jordan Lee"
+                    className="pl-9"
+                    value={formData.contact_name}
+                    onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
                   />
                 </div>
               </div>
@@ -313,7 +328,7 @@ export default function SuperAdminPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-slate-700 mb-1">Contact Designation</label>
                 <div className="relative">
                   <Briefcase className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
@@ -325,11 +340,13 @@ export default function SuperAdminPage() {
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="border-t border-slate-100 pt-4 mt-2">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2 font-bold">
-                  First Admin Account
-                </span>
+            <div className="border-t border-slate-100 pt-4 mt-5">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2 font-bold">
+                First Admin Account
+              </span>
+              <div className="max-w-md">
                 <label className="block text-slate-700 mb-1">Admin Email Address</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
@@ -343,98 +360,98 @@ export default function SuperAdminPage() {
                   />
                 </div>
                 <span className="text-[10px] text-slate-400 font-normal mt-1 block">
-                  They&apos;ll receive an email invite to set their own password — no password is set here.
+                  They&apos;ll receive an email invite to set their own password, no password is set here.
                 </span>
               </div>
+            </div>
 
-              <Button type="submit" className="w-full mt-4" loading={submitting}>
-                <Plus className="h-4 w-4 mr-2" /> Onboard Company
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            <Button type="submit" className="mt-5" loading={submitting}>
+              <Plus className="h-4 w-4 mr-2" /> Onboard Company
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-        {/* Company Registry */}
-        <Card className="xl:col-span-2 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Building className="h-4 w-4 text-primary" /> Company Directory
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Every onboarded company, with fully isolated employees, campaigns, and templates.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-xs gap-2">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                <span>Loading company directory...</span>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Admin / Contact</TableHead>
-                    <TableHead>Onboarded</TableHead>
-                    <TableHead className="text-center">Employees</TableHead>
-                    <TableHead className="text-center">Campaigns</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+      {/* Company Registry */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <Building className="h-4 w-4 text-primary" /> Company Directory
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Every onboarded company, with fully isolated employees, campaigns, and templates.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-xs gap-2">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span>Loading company directory...</span>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Admin / Contact</TableHead>
+                  <TableHead>Onboarded</TableHead>
+                  <TableHead className="text-center">Employees</TableHead>
+                  <TableHead className="text-center">Campaigns</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tenantsList.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="py-3">
+                      <div className="font-semibold text-slate-900">{t.company_name}</div>
+                      <div className="text-[10px] text-slate-400">{t.designation}</div>
+                    </TableCell>
+                    <TableCell className="text-slate-600 text-xs py-3">
+                      <div>{t.contact_name || t.admin_email}</div>
+                      <div className="text-[10px] text-slate-400">{t.admin_email}</div>
+                      <div className="text-[10px] text-slate-400">{t.contact_mobile || '-'}</div>
+                    </TableCell>
+                    <TableCell className="text-slate-500 text-xs py-3">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span>{t.created_at ? new Date(t.created_at).toLocaleDateString() : 'N/A'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center py-3">
+                      <Badge variant="success" className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
+                        <Users className="h-3 w-3 shrink-0" /> {t.employee_count}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center py-3">
+                      <Badge variant="info" className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
+                        <Send className="h-3 w-3 shrink-0" /> {t.campaign_count}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right py-3">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => openEdit(t)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(t)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tenantsList.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="py-3">
-                        <div className="font-semibold text-slate-900">{t.company_name}</div>
-                        <div className="text-[10px] text-slate-400">{t.designation}</div>
-                      </TableCell>
-                      <TableCell className="text-slate-600 text-xs py-3">
-                        <div>{t.admin_email}</div>
-                        <div className="text-[10px] text-slate-400">{t.contact_mobile || '—'}</div>
-                      </TableCell>
-                      <TableCell className="text-slate-500 text-xs py-3">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <span>{t.created_at ? new Date(t.created_at).toLocaleDateString() : 'N/A'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center py-3">
-                        <Badge variant="success" className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
-                          <Users className="h-3 w-3 shrink-0" /> {t.employee_count}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center py-3">
-                        <Badge variant="info" className="flex items-center justify-center gap-1 mx-auto w-12 text-[10px]">
-                          <Send className="h-3 w-3 shrink-0" /> {t.campaign_count}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right py-3">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => openEdit(t)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-destructive" onClick={() => setDeleteTarget(t)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {tenantsList.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-10 text-slate-400 text-xs">
-                        No companies onboarded yet — use the form to add your first one.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-      </div>
+                ))}
+                {tenantsList.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-slate-400 text-xs">
+                      No companies onboarded yet, use the form above to add your first one.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Edit Company Dialog */}
       <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
@@ -447,6 +464,10 @@ export default function SuperAdminPage() {
             <div>
               <label className="block text-slate-700 mb-1">Company Name</label>
               <Input value={editForm.company_name} onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-slate-700 mb-1">Contact Name</label>
+              <Input value={editForm.contact_name} onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })} />
             </div>
             <div>
               <label className="block text-slate-700 mb-1">Contact Email</label>
