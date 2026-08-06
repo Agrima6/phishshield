@@ -76,10 +76,27 @@ export default function LoginPage() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     setRestoring(true);
-    completeSignIn().catch((err: any) => {
-      toast.error(err?.errors?.[0]?.message || err.message || 'Failed to restore your session.');
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      toast.error('Restoring your session is taking too long. Please sign in again.');
       setRestoring(false);
-    });
+    }, 12000);
+    completeSignIn()
+      .catch((err: any) => {
+        if (settled) return;
+        toast.error(err?.errors?.[0]?.message || err.message || 'Failed to restore your session.');
+        setRestoring(false);
+      })
+      .finally(() => {
+        settled = true;
+        clearTimeout(timeout);
+      });
+    return () => {
+      settled = true;
+      clearTimeout(timeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, isSignedIn]);
 
@@ -154,6 +171,20 @@ export default function LoginPage() {
       <div className="flex flex-col items-center gap-2 py-12">
         <RefreshCw className="h-6 w-6 text-primary animate-spin" />
         <span className="text-sm font-medium text-slate-600">Restoring your session...</span>
+        <button
+          type="button"
+          onClick={async () => {
+            setRestoring(false);
+            try {
+              await clerk.signOut();
+            } catch {
+              // ignore — we're showing the manual login form either way
+            }
+          }}
+          className="text-xs text-primary hover:text-primary-hover font-semibold mt-2"
+        >
+          Taking too long? Sign in manually
+        </button>
       </div>
     );
   }
