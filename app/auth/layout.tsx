@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { ShieldCheck, Award, Lock } from 'lucide-react';
+import { DotGrid } from '@/components/landing/dot-grid';
 
 export default function AuthLayout({
   children,
@@ -13,8 +14,16 @@ export default function AuthLayout({
     <div className="min-h-screen grid grid-cols-1 md:grid-cols-12 bg-slate-50">
       {/* Left Branding / Compliance Pane */}
       <div className="hidden md:flex md:col-span-5 bg-[#1c0507] text-white flex-col justify-between p-12 relative overflow-hidden">
-        {/* Subtle geometric grid background overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(#3a1418_1px,transparent_1.5px)] [background-size:24px_24px] opacity-30" />
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-40"
+          src="/videos/threat-terminal.mp4"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1c0507]/95 via-[#1c0507]/85 to-[#1c0507]/95" />
+        <DotGrid dotColor="rgba(255,255,255,0.35)" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3">
