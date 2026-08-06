@@ -1,24 +1,24 @@
 'use client';
 
-import React, { useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  ShieldCheck, MailWarning, Users, BarChart3, Clock, Lock,
-  ArrowRight, MousePointerClick, GraduationCap, FileText, Sparkles,
+  MailWarning, Users, BarChart3, Clock, Lock,
+  ArrowRight, MousePointerClick, GraduationCap, FileText, Sparkles, TriangleAlert,
 } from 'lucide-react';
 import { Reveal } from './reveal';
+import { DotGrid } from './dot-grid';
 
 const features = [
   {
     icon: MailWarning,
     title: 'Realistic Phishing Simulations',
-    description: 'Launch authorized mock campaigns using a library of real-world lures — password resets, invoices, delivery notices, and more.',
+    description: 'Launch authorized mock campaigns using a library of real-world lures: password resets, invoices, delivery notices, and more.',
   },
   {
     icon: MousePointerClick,
     title: 'Real-Time Click Tracking',
-    description: 'See exactly who opened, clicked, or reported a simulated attack, the moment it happens — down to device and location.',
+    description: 'See exactly who opened, clicked, or reported a simulated attack the moment it happens, down to device and location.',
   },
   {
     icon: BarChart3,
@@ -33,7 +33,7 @@ const features = [
   {
     icon: Clock,
     title: 'Scheduled Campaigns',
-    description: 'Queue a simulation for the exact date and time you want it to land — no need to be online when it fires.',
+    description: 'Queue a simulation for the exact date and time you want it to land, with no need to be online when it fires.',
   },
   {
     icon: FileText,
@@ -44,57 +44,25 @@ const features = [
 
 const steps = [
   { step: '01', title: 'Add your team', desc: 'Import your employee directory by CSV, organized by department.' },
-  { step: '02', title: 'Launch a simulation', desc: 'Pick a realistic template, choose your audience, and deploy — instantly or scheduled.' },
+  { step: '02', title: 'Launch a simulation', desc: 'Pick a realistic template, choose your audience, and deploy instantly or on a schedule.' },
   { step: '03', title: 'Review the results', desc: 'Watch opens and clicks land in real time, then export a compliance-ready report.' },
 ];
 
-function HeroSpotlight() {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    ref.current!.style.setProperty('--x', `${x}%`);
-    ref.current!.style.setProperty('--y', `${y}%`);
-  };
-
-  return (
-    <div
-      ref={ref}
-      onMouseMove={handleMouseMove}
-      className="absolute inset-0 overflow-hidden [--x:50%] [--y:30%]"
-    >
-      {/* Drifting starfield */}
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.35)_1px,transparent_1.5px)] [background-size:26px_26px] opacity-30 animate-[driftBg_60s_linear_infinite]" />
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.2)_1px,transparent_1.5px)] [background-size:46px_46px] opacity-20 animate-[driftBg_90s_linear_infinite_reverse]" />
-
-      {/* Mouse-following spotlight */}
-      <div
-        className="absolute inset-0 transition-opacity duration-300"
-        style={{
-          background: 'radial-gradient(500px circle at var(--x) var(--y), rgba(233,79,101,0.22), transparent 60%)',
-        }}
-      />
-
-      {/* Floating gradient orbs */}
-      <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-primary/25 blur-3xl animate-[floatSlow_10s_ease-in-out_infinite]" />
-      <div className="absolute top-1/3 -right-20 h-80 w-80 rounded-full bg-rose-500/15 blur-3xl animate-[floatSlow_13s_ease-in-out_infinite_1s]" />
-      <div className="absolute bottom-0 left-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl animate-[floatSlow_16s_ease-in-out_infinite_2s]" />
-    </div>
-  );
-}
+const stats = [
+  { value: '1 in 3', label: 'employees click a simulated phishing email on their first attempt' },
+  { value: '<5 min', label: 'to launch a fully targeted campaign from template to send' },
+  { value: '90%+', label: 'reduction in click-through rates after a few rounds of training' },
+];
 
 export default function LandingClient() {
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
       {/* Nav */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/70 border-b border-slate-100">
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/80 border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Image src="/workmate-shield-logo.png" alt="Workmate Shield" width={36} height={36} className="h-9 w-9 rounded-md" />
-            <span className="font-bold text-sm tracking-wider">
+            <span className="font-bold text-sm tracking-wider text-slate-900">
               WORKMATE <span className="text-primary">SHIELD</span>
             </span>
           </div>
@@ -109,51 +77,115 @@ export default function LandingClient() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[#0d0304] text-white">
-        <HeroSpotlight />
-        <div className="max-w-6xl mx-auto px-6 py-28 md:py-36 relative z-10">
-          <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-200 bg-white/10 border border-white/10 px-3 py-1 rounded-full mb-6 animate-[fadeInUp_0.6s_ease-out]">
-              <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" /> Security Awareness Platform
+      <section className="relative overflow-hidden bg-white">
+        <DotGrid className="opacity-90" />
+        <div className="pointer-events-none absolute -top-32 -left-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl animate-[floatSlow_12s_ease-in-out_infinite]" />
+        <div className="pointer-events-none absolute top-1/3 -right-24 h-80 w-80 rounded-full bg-rose-300/20 blur-3xl animate-[floatSlow_15s_ease-in-out_infinite_1s]" />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-6 pt-20 pb-24 md:pt-28 md:pb-32 grid md:grid-cols-2 gap-14 items-center">
+          <div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 border border-primary/15 px-3 py-1 rounded-full mb-6 animate-[fadeInUp_0.6s_ease-out]">
+              <Sparkles className="h-3.5 w-3.5" /> Security Awareness Platform
             </span>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-tight mb-6 animate-[fadeInUp_0.7s_ease-out_0.1s_both]">
-              Train your team to spot phishing —{' '}
-              <span className="bg-gradient-to-r from-primary via-rose-300 to-primary bg-[length:200%_auto] bg-clip-text text-transparent animate-[shimmer_4s_linear_infinite]">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight mb-6 text-slate-900 animate-[fadeInUp_0.7s_ease-out_0.1s_both]">
+              Train your team to spot phishing{' '}
+              <span className="bg-gradient-to-r from-primary via-rose-500 to-primary bg-[length:200%_auto] bg-clip-text text-transparent animate-[shimmer_4s_linear_infinite]">
                 before attackers do.
               </span>
             </h1>
-            <p className="text-lg text-slate-300 leading-relaxed mb-8 max-w-xl animate-[fadeInUp_0.7s_ease-out_0.2s_both]">
+            <p className="text-lg text-slate-600 leading-relaxed mb-8 max-w-xl animate-[fadeInUp_0.7s_ease-out_0.2s_both]">
               Workmate Shield runs authorized, realistic phishing simulations across your organization,
-              tracks who clicks in real time, and turns the results into clear risk analytics — so your
+              tracks who clicks in real time, and turns the results into clear risk analytics so your
               weakest link never becomes the headline.
             </p>
             <div className="flex flex-wrap items-center gap-4 animate-[fadeInUp_0.7s_ease-out_0.3s_both]">
               <Link
                 href="/auth/login"
-                className="group relative overflow-hidden inline-flex items-center gap-2 text-sm font-bold px-6 py-3.5 rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-105 active:scale-95"
+                className="group relative overflow-hidden inline-flex items-center gap-2 text-sm font-bold px-6 py-3.5 rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Get Started <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </span>
                 <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
               </Link>
-              <span className="text-xs text-slate-400 flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5" /> For internal, authorized security-awareness use only
               </span>
             </div>
           </div>
+
+          {/* Floating product mockup */}
+          <Reveal delay={150}>
+            <div className="relative mx-auto max-w-md md:max-w-none animate-[floatSlow_8s_ease-in-out_infinite]">
+              <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 to-rose-400/10 rounded-3xl blur-2xl" />
+              <div className="relative rounded-2xl border border-slate-200 shadow-2xl shadow-primary/10 bg-white overflow-hidden rotate-2 hover:rotate-0 transition-transform duration-500">
+                <div className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-green-300" />
+                  <span className="ml-3 text-[11px] text-slate-400 font-medium">Inbox: Simulated Campaign</span>
+                </div>
+                <video
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-auto block"
+                  src="/videos/phishing-inbox.mp4"
+                />
+              </div>
+            </div>
+          </Reveal>
         </div>
-        {/* Fade to white at bottom of hero */}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-b from-transparent to-white pointer-events-none" />
+      </section>
+
+      {/* Threat is real */}
+      <section className="bg-slate-50 border-y border-slate-100">
+        <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-12 items-center">
+          <Reveal>
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-xl aspect-video bg-black">
+              <video
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full h-full object-cover opacity-90"
+                src="/videos/threat-terminal.mp4"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <div className="absolute bottom-4 left-4 flex items-center gap-2 text-white text-xs font-semibold bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                <TriangleAlert className="h-3.5 w-3.5 text-rose-300" /> Live threat simulation
+              </div>
+            </div>
+          </Reveal>
+          <Reveal delay={100}>
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight mb-4">The threat isn&apos;t hypothetical.</h2>
+              <p className="text-slate-600 leading-relaxed mb-8">
+                Phishing is still the number one way attackers get into an organization. One convincing
+                email is all it takes, and most teams only find out how exposed they are after it&apos;s
+                too late. Workmate Shield lets you find out first, safely.
+              </p>
+              <div className="grid grid-cols-3 gap-4">
+                {stats.map((s) => (
+                  <div key={s.value}>
+                    <div className="text-2xl font-bold text-primary mb-1">{s.value}</div>
+                    <div className="text-xs text-slate-500 leading-snug">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        </div>
       </section>
 
       {/* Features */}
-      <section className="bg-slate-50 border-y border-slate-100">
+      <section className="bg-white">
         <div className="max-w-6xl mx-auto px-6 py-20">
           <Reveal>
             <div className="text-center max-w-2xl mx-auto mb-14">
               <h2 className="text-3xl font-bold tracking-tight mb-3">Everything you need to run a real program</h2>
-              <p className="text-slate-500 text-sm">Not just an email blaster — a full phishing-awareness lifecycle from simulation to reporting.</p>
+              <p className="text-slate-500 text-sm">Not just an email blaster: a full phishing-awareness lifecycle from simulation to reporting.</p>
             </div>
           </Reveal>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -196,23 +228,22 @@ export default function LandingClient() {
       </section>
 
       {/* CTA */}
-      <section className="relative overflow-hidden bg-[#0d0304] text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.25)_1px,transparent_1.5px)] [background-size:28px_28px] opacity-20 animate-[driftBg_70s_linear_infinite]" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-72 w-72 rounded-full bg-primary/25 blur-3xl animate-[floatSlow_12s_ease-in-out_infinite]" />
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#3a0a10] via-[#5c0f18] to-[#7a1220] text-white">
+        <DotGrid dotColor="rgba(255,255,255,0.25)" className="opacity-60" />
         <Reveal className="relative z-10">
           <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-            <GraduationCap className="h-10 w-10 text-primary mx-auto mb-4 animate-[floatSlow_4s_ease-in-out_infinite]" />
+            <GraduationCap className="h-10 w-10 text-rose-200 mx-auto mb-4 animate-[floatSlow_4s_ease-in-out_infinite]" />
             <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4">
               Your people are your first line of defense. Make sure they&apos;re ready.
             </h2>
             <Link
               href="/auth/login"
-              className="group relative overflow-hidden inline-flex items-center gap-2 text-sm font-bold px-6 py-3.5 rounded-lg bg-primary shadow-lg shadow-primary/30 transition-transform hover:scale-105 active:scale-95 mt-4"
+              className="group relative overflow-hidden inline-flex items-center gap-2 text-sm font-bold px-6 py-3.5 rounded-lg bg-white text-[#7a1220] shadow-lg shadow-black/20 transition-transform hover:scale-105 active:scale-95 mt-4"
             >
               <span className="relative z-10 flex items-center gap-2">
                 Sign In to Console <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </span>
-              <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+              <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-black/10 to-transparent" />
             </Link>
           </div>
         </Reveal>
@@ -233,11 +264,7 @@ export default function LandingClient() {
         }
         @keyframes floatSlow {
           0%, 100% { transform: translateY(0) translateX(0); }
-          50% { transform: translateY(-18px) translateX(10px); }
-        }
-        @keyframes driftBg {
-          from { background-position: 0 0; }
-          to { background-position: 200px 200px; }
+          50% { transform: translateY(-14px) translateX(6px); }
         }
         @keyframes shimmer {
           to { background-position: 200% center; }
