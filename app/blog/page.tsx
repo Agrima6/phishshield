@@ -25,7 +25,7 @@ function formatDate(iso: string) {
 }
 
 export default function BlogPage() {
-  const { role } = useSession();
+  const { role, isLoggedIn } = useSession();
   const isSuperAdmin = role === 'super_admin';
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
@@ -91,8 +91,11 @@ export default function BlogPage() {
               WORKMATE <span className="text-primary">SHIELD</span>
             </span>
           </Link>
-          <Link href="/" className="text-xs font-semibold text-primary hover:text-primary-hover flex items-center gap-1.5">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Home
+          <Link
+            href={isLoggedIn ? '/dashboard' : '/'}
+            className="text-xs font-semibold text-primary hover:text-primary-hover flex items-center gap-1.5"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> {isLoggedIn ? 'Back to Dashboard' : 'Back to Home'}
           </Link>
         </div>
       </header>

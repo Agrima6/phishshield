@@ -26,7 +26,8 @@ import {
   RotateCcw,
   RefreshCw,
   Globe,
-  ShieldCheck
+  ShieldCheck,
+  Newspaper
 } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
@@ -169,6 +170,7 @@ export default function DashboardLayout({
     { name: 'Phishing Templates', href: '/dashboard/templates', icon: FileCode },
     { name: 'Reports & Analytics', href: '/dashboard/reports', icon: BarChart3 },
     { name: 'Audit Activity Logs', href: '/dashboard/audit-logs', icon: FileText },
+    { name: 'Blog', href: '/blog', icon: Newspaper },
   ];
 
   const menuItems = [...baseMenuItems];
