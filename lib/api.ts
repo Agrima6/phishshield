@@ -1,4 +1,4 @@
-import { TenantSettings, Campaign, PhishingTemplate, Employee } from '@/types';
+import { TenantSettings, Campaign, PhishingTemplate, Employee, BlogPost } from '@/types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -466,6 +466,26 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       });
+    },
+  },
+
+  blog: {
+    list: async () => fetcher<BlogPost[]>('/api/blog'),
+    get: async (idOrSlug: string) => fetcher<BlogPost>(`/api/blog/${idOrSlug}`),
+    create: async (data: { title: string; content: string; author_name: string; author_company?: string }) => {
+      return fetcher<BlogPost>('/api/blog', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    update: async (id: string, data: { title: string; content: string }) => {
+      return fetcher<BlogPost>(`/api/blog/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+    remove: async (id: string) => {
+      return fetcher<{ status: string }>(`/api/blog/${id}`, { method: 'DELETE' });
     },
   },
 };

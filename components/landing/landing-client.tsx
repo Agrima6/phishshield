@@ -1,10 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   MailWarning, Users, BarChart3, Clock, Lock,
-  ArrowRight, MousePointerClick, GraduationCap, FileText, Sparkles, TriangleAlert,
+  ArrowRight, MousePointerClick, GraduationCap, FileText, Sparkles, TriangleAlert, X,
 } from 'lucide-react';
 import { Reveal } from './reveal';
 import { DotGrid } from './dot-grid';
@@ -14,38 +15,59 @@ const features = [
     icon: MailWarning,
     title: 'Realistic Phishing Simulations',
     description: 'Launch authorized mock campaigns using a library of real-world lures: password resets, invoices, delivery notices, and more.',
+    detail: 'Choose from a growing library of templates across IT & Security, Finance & Payroll, HR & Benefits, Productivity & Collaboration, and Shipping & Delivery themes, or write your own from scratch with a full HTML editor. Preview exactly what a recipient will see before you send, including the subject line and sender name.',
   },
   {
     icon: MousePointerClick,
     title: 'Real-Time Click Tracking',
     description: 'See exactly who opened, clicked, or reported a simulated attack the moment it happens, down to device and location.',
+    detail: 'Every open and click is logged the instant it happens, along with device type, operating system, and IP address. Built-in bot and scanner filtering keeps automated email security tools from skewing your results, so the numbers reflect real human behavior.',
   },
   {
     icon: BarChart3,
     title: 'Department Risk Analytics',
     description: 'Spot your most at-risk teams with live vigilance scores, click-rate trends, and recent risk event feeds.',
+    detail: 'A vigilance score gauge, a department-by-department click-rate chart, and a campaign performance trend line give you a clear read on organizational risk at a glance, not just a spreadsheet of raw numbers.',
   },
   {
     icon: Users,
     title: 'Employee Directory & Targeting',
     description: 'Organize your workforce by department, filter and target campaigns precisely, and track individual improvement over time.',
+    detail: 'Import your whole team by CSV in one pass, organized by department from the start. Target a campaign at a single department, a custom selection, or your entire organization, and track how each employee\'s click rate improves across rounds of training.',
   },
   {
     icon: Clock,
     title: 'Scheduled Campaigns',
     description: 'Queue a simulation for the exact date and time you want it to land, with no need to be online when it fires.',
+    detail: 'Set a campaign to fire at a specific date and time and walk away. It sends automatically in the background, and you can cancel or reschedule it any time before it goes out.',
   },
   {
     icon: FileText,
     title: 'One-Click Compliance Reports',
     description: 'Export branded PDF and CSV reports for audits and leadership reviews, generated in seconds.',
+    detail: 'Generate a PDF report carrying your own company logo, complete with department risk breakdowns and campaign totals, ready to hand to auditors or leadership. Need the raw numbers instead? Export the same data as CSV in one click.',
   },
 ];
 
 const steps = [
-  { step: '01', title: 'Add your team', desc: 'Import your employee directory by CSV, organized by department.' },
-  { step: '02', title: 'Launch a simulation', desc: 'Pick a realistic template, choose your audience, and deploy instantly or on a schedule.' },
-  { step: '03', title: 'Review the results', desc: 'Watch opens and clicks land in real time, then export a compliance-ready report.' },
+  {
+    step: '01',
+    title: 'Add your team',
+    desc: 'Import your employee directory by CSV, organized by department.',
+    detail: 'Download the provided CSV template, fill in names, emails, and departments, and import the whole list in one step. You can always add or edit individual employees afterward from the Employee Directory.',
+  },
+  {
+    step: '02',
+    title: 'Launch a simulation',
+    desc: 'Pick a realistic template, choose your audience, and deploy instantly or on a schedule.',
+    detail: 'Walk through a short wizard: name the campaign, pick your audience (filterable by department), choose a template, and optionally select a custom sending profile so it goes out from your own company domain instead of a shared address.',
+  },
+  {
+    step: '03',
+    title: 'Review the results',
+    desc: 'Watch opens and clicks land in real time, then export a compliance-ready report.',
+    detail: 'Watch sent, opened, and clicked counts update live as recipients interact with the email. Drill into any single campaign for a per-recipient breakdown, then export a branded PDF or CSV report when you are ready to share results.',
+  },
 ];
 
 const stats = [
@@ -55,6 +77,9 @@ const stats = [
 ];
 
 export default function LandingClient() {
+  const [expandedFeature, setExpandedFeature] = useState<number | null>(null);
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
       {/* Nav */}
@@ -66,13 +91,18 @@ export default function LandingClient() {
               WORKMATE <span className="text-primary">SHIELD</span>
             </span>
           </div>
-          <Link
-            href="/auth/login"
-            className="group relative overflow-hidden text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-primary-foreground transition-transform hover:scale-105 active:scale-95"
-          >
-            <span className="relative z-10">Sign In</span>
-            <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-          </Link>
+          <div className="flex items-center gap-5">
+            <Link href="/blog" className="text-sm font-semibold text-slate-600 hover:text-primary transition-colors">
+              Blog
+            </Link>
+            <Link
+              href="/auth/login"
+              className="group relative overflow-hidden text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-primary-foreground transition-transform hover:scale-105 active:scale-95"
+            >
+              <span className="relative z-10">Sign In</span>
+              <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -193,12 +223,19 @@ export default function LandingClient() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((f, i) => (
               <Reveal key={f.title} delay={i * 80}>
-                <div className="group bg-white border border-slate-200 rounded-xl p-6 h-full transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-primary/30">
+                <div className="group bg-white border border-slate-200 rounded-xl p-6 h-full flex flex-col transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-primary/30">
                   <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
                     <f.icon className="h-5 w-5" />
                   </div>
                   <h3 className="font-bold text-sm mb-2">{f.title}</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">{f.description}</p>
+                  <p className="text-xs text-slate-500 leading-relaxed mb-4">{f.description}</p>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedFeature(i)}
+                    className="mt-auto self-start text-xs font-semibold text-primary hover:text-primary-hover inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    More <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                  </button>
                 </div>
               </Reveal>
             ))}
@@ -222,7 +259,14 @@ export default function LandingClient() {
                   {s.step}
                 </span>
                 <h3 className="font-bold text-base mt-4 mb-2">{s.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
+                <p className="text-sm text-slate-500 leading-relaxed mb-3">{s.desc}</p>
+                <button
+                  type="button"
+                  onClick={() => setExpandedStep(i)}
+                  className="text-xs font-semibold text-primary hover:text-primary-hover inline-flex items-center gap-1 cursor-pointer"
+                >
+                  More <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                </button>
               </div>
             </Reveal>
           ))}
@@ -255,6 +299,10 @@ export default function LandingClient() {
       <footer className="border-t border-slate-100">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
           <span>© 2026 Workmate Shield. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <Link href="/blog" className="hover:text-primary transition-colors">Blog</Link>
+            <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+          </div>
           <span>Intelligence that shields.</span>
         </div>
       </footer>
@@ -272,6 +320,73 @@ export default function LandingClient() {
           to { background-position: 200% center; }
         }
       `}</style>
+
+      {expandedFeature !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+          onClick={() => setExpandedFeature(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full p-7 animate-[fadeInUp_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setExpandedFeature(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="h-11 w-11 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4">
+              {(() => {
+                const Icon = features[expandedFeature].icon;
+                return <Icon className="h-5.5 w-5.5" />;
+              })()}
+            </div>
+            <h3 className="font-bold text-lg mb-3">{features[expandedFeature].title}</h3>
+            <p className="text-sm text-slate-600 leading-relaxed">{features[expandedFeature].detail}</p>
+            <button
+              type="button"
+              onClick={() => setExpandedFeature(null)}
+              className="mt-6 w-full text-sm font-semibold px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {expandedStep !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+          onClick={() => setExpandedStep(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full p-7 animate-[fadeInUp_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setExpandedStep(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <span className="inline-flex items-center justify-center h-11 w-11 rounded-full bg-primary/10 text-primary font-bold text-sm border border-primary/20 mb-4">
+              {steps[expandedStep].step}
+            </span>
+            <h3 className="font-bold text-lg mb-3">{steps[expandedStep].title}</h3>
+            <p className="text-sm text-slate-600 leading-relaxed">{steps[expandedStep].detail}</p>
+            <button
+              type="button"
+              onClick={() => setExpandedStep(null)}
+              className="mt-6 w-full text-sm font-semibold px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

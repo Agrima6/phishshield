@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,6 +31,7 @@ export default function SignUpPage() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
 
   const {
     register,
@@ -53,7 +55,11 @@ export default function SignUpPage() {
 
   const onSubmit = async (data: SignUpFormValues) => {
     if (!isLoaded) {
-      toast.error('Still connecting to the authentication service — please try again in a moment.');
+      toast.error('Still connecting to the authentication service, please try again in a moment.');
+      return;
+    }
+    if (!agreedToPrivacy) {
+      toast.error('Please agree to the Privacy Policy to continue.');
       return;
     }
     setLoading(true);
@@ -214,7 +220,23 @@ export default function SignUpPage() {
           )}
         </div>
 
-        <Button type="submit" className="w-full" loading={loading}>
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={agreedToPrivacy}
+            onChange={(e) => setAgreedToPrivacy(e.target.checked)}
+            className="mt-0.5 h-3.5 w-3.5 accent-primary shrink-0"
+          />
+          <span className="text-xs text-slate-600 leading-relaxed">
+            I agree to the{' '}
+            <Link href="/privacy" target="_blank" className="text-primary font-semibold hover:underline">
+              Privacy Policy
+            </Link>
+            , including how my organization&apos;s data is collected and used on this platform.
+          </span>
+        </label>
+
+        <Button type="submit" className="w-full" loading={loading} disabled={!agreedToPrivacy}>
           Create Account
         </Button>
       </form>

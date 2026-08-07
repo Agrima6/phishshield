@@ -78,3 +78,14 @@ export interface SystemNotification {
   read: boolean;
   type: 'campaign' | 'system' | 'training';
 }
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  author_name: string;
+  author_company: string;
+  created_at: string;
+  updated_at: string;
+}
