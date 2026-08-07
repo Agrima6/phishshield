@@ -97,6 +97,12 @@ export function useSession() {
     } catch {
       // ignore
     }
+    // Belt-and-suspenders: Clerk's signed-out state can take a tick to
+    // propagate through React context, so the login page's isSignedIn check
+    // may still read stale (true) right as it mounts. This flag lets the
+    // login page skip auto-restore unconditionally right after a deliberate
+    // logout, regardless of that timing race.
+    sessionStorage.setItem('phish_just_logged_out', '1');
     localStorage.removeItem('phish_session_token');
     localStorage.removeItem('phish_username');
     localStorage.removeItem('phish_display_name');

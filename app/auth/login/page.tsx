@@ -74,7 +74,21 @@ export default function LoginPage() {
   // through. So on load, if we're already signed in at the Clerk level, skip
   // straight to establishing our own app session rather than showing the form.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!isLoaded) return;
+    // A deliberate logout just happened. Clerk's signed-out state can take a
+    // tick to propagate through React context, so isSignedIn may still read
+    // stale (true) right as this page mounts - without this check we'd
+    // immediately restore the session we just asked to end, making logout a
+    // no-op. Skip the restore, and force the sign-out through again in case
+    // it's genuinely still active.
+    if (typeof window !== 'undefined' && sessionStorage.getItem('phish_just_logged_out')) {
+      sessionStorage.removeItem('phish_just_logged_out');
+      if (isSignedIn) {
+        clerk.signOut().catch(() => {});
+      }
+      return;
+    }
+    if (!isSignedIn) return;
     setRestoring(true);
     let settled = false;
     const timeout = setTimeout(() => {
