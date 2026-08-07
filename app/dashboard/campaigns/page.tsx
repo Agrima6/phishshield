@@ -29,6 +29,21 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
+// After a recipient clicks and sees the awareness landing page, this decides
+// where the "Sign in" button ultimately sends them. Match the template's
+// implied brand where it's a real, well-known one; otherwise fall back to a
+// neutral page instead of always pointing at Microsoft regardless of theme.
+function defaultRedirectForTemplate(templateName: string): string {
+  const name = templateName.toLowerCase();
+  if (name.includes('microsoft') || name.includes('password') || name.includes('vpn') || name.includes('login')) {
+    return 'https://login.microsoftonline.com';
+  }
+  if (name.includes('onedrive')) return 'https://onedrive.live.com';
+  if (name.includes('zoom')) return 'https://zoom.us';
+  if (name.includes('workday') || name.includes('benefits')) return 'https://www.workday.com';
+  return 'https://www.google.com';
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -50,7 +65,8 @@ export default function CampaignsPage() {
     subject: '',
     senderName: '',
     templateId: '',
-    emailConfigId: ''
+    emailConfigId: '',
+    redirectUrl: ''
   });
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -111,7 +127,7 @@ export default function CampaignsPage() {
         subject: newCampaign.subject,
         body_html: bodyHtml,
         sender_name: newCampaign.senderName,
-        redirect_url: 'https://login.microsoftonline.com',
+        redirect_url: newCampaign.redirectUrl || defaultRedirectForTemplate(chosenTemplate?.name || ''),
         email_config_id: newCampaign.emailConfigId || undefined
       });
 
@@ -128,7 +144,8 @@ export default function CampaignsPage() {
         subject: '',
         senderName: '',
         templateId: '',
-        emailConfigId: ''
+        emailConfigId: '',
+        redirectUrl: ''
       });
       loadData();
     } catch (err: any) {
@@ -541,7 +558,12 @@ export default function CampaignsPage() {
                 return (
                   <div 
                     key={tempId}
-                    onClick={() => setNewCampaign({ ...newCampaign, templateId: tempId, subject: temp.subject })}
+                    onClick={() => setNewCampaign({
+                      ...newCampaign,
+                      templateId: tempId,
+                      subject: temp.subject,
+                      redirectUrl: defaultRedirectForTemplate(temp.name || ''),
+                    })}
                     className={`p-3 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${
                       newCampaign.templateId === tempId 
                         ? 'border-primary bg-amber-50/20' 
@@ -586,12 +608,26 @@ export default function CampaignsPage() {
                   <option value="">Default System gateway (Workmate Shield Shared SMTP)</option>
                   {settings?.emailConfigs.map((cfg: any) => (
                     <option key={cfg.id} value={cfg.id}>
-                      {cfg.name} ({cfg.provider === 'smtp' ? 'SMTP' : 'SendGrid'}) — {cfg.fromEmail}
+                      {cfg.name} ({cfg.provider === 'smtp' ? 'SMTP' : 'SendGrid'}): {cfg.fromEmail}
                     </option>
                   ))}
                 </Select>
                 <p className="text-[10px] text-slate-400 font-normal mt-1.5 leading-relaxed">
                   Tenant configuration allows you to select custom SMTP profiles to bypass spam triggers.
+                  To send from your own company domain, add a profile in Tenant Settings first.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Post-Click Redirect URL</label>
+                <Input
+                  placeholder="https://login.microsoftonline.com"
+                  value={newCampaign.redirectUrl}
+                  onChange={(e) => setNewCampaign({ ...newCampaign, redirectUrl: e.target.value })}
+                />
+                <p className="text-[10px] text-slate-400 font-normal mt-1.5 leading-relaxed">
+                  Where the &quot;Sign in&quot; button on the awareness page sends the recipient afterward.
+                  Pre-filled to match the selected template, but you can point it anywhere.
                 </p>
               </div>
             </div>
