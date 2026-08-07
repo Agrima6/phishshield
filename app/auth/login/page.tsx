@@ -138,6 +138,13 @@ function LoginPageInner() {
     }
     setLoading(true);
     try {
+      // A stale Clerk session (e.g. left over from an interrupted logout)
+      // makes signIn.create() below reject with "session already exists"
+      // instead of just letting a fresh sign-in through. Clear it first so
+      // submitting the form always starts from a clean slate.
+      if (isSignedIn) {
+        await clerk.signOut().catch(() => {});
+      }
       // 1. Authenticate against Clerk directly (this Clerk instance requires a password first factor)
       const result = await clerk.client.signIn.create({
         identifier: data.email,
@@ -184,6 +191,9 @@ function LoginPageInner() {
     }
     setGoogleLoading(true);
     try {
+      if (isSignedIn) {
+        await clerk.signOut().catch(() => {});
+      }
       // Full-page redirect to Google; the browser navigates away from here.
       await clerk.client.signIn.authenticateWithRedirect({
         strategy: 'oauth_google',
