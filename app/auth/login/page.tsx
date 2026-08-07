@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
@@ -21,7 +21,16 @@ const loginSchema = zod.object({
 type LoginFormValues = zod.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useSession();
   const clerk = useClerk();
   const { getToken, isLoaded, isSignedIn } = useAuth();
@@ -74,6 +83,9 @@ export default function LoginPage() {
   // through. So on load, if we're already signed in at the Clerk level, skip
   // straight to establishing our own app session rather than showing the form.
   useEffect(() => {
+    const loggedOutParam = searchParams.get('loggedout') === '1';
+    const loggedOutFlag = typeof window !== 'undefined' && sessionStorage.getItem('phish_just_logged_out') === '1';
+    console.log('[login] auto-restore check:', { isLoaded, isSignedIn, loggedOutParam, loggedOutFlag });
     if (!isLoaded) return;
     // A deliberate logout just happened. Clerk's signed-out state can take a
     // tick to propagate through React context, so isSignedIn may still read
@@ -81,14 +93,19 @@ export default function LoginPage() {
     // immediately restore the session we just asked to end, making logout a
     // no-op. Skip the restore, and force the sign-out through again in case
     // it's genuinely still active.
-    if (typeof window !== 'undefined' && sessionStorage.getItem('phish_just_logged_out')) {
+    if (loggedOutParam || loggedOutFlag) {
+      console.log('[login] skipping auto-restore due to logout flag/param');
       sessionStorage.removeItem('phish_just_logged_out');
+      if (loggedOutParam) {
+        router.replace('/auth/login');
+      }
       if (isSignedIn) {
         clerk.signOut().catch(() => {});
       }
       return;
     }
     if (!isSignedIn) return;
+    console.log('[login] proceeding to auto-restore session');
     setRestoring(true);
     let settled = false;
     const timeout = setTimeout(() => {

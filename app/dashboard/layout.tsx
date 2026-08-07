@@ -92,10 +92,14 @@ export default function DashboardLayout({
     }
   }, [loginTenant]);
 
-  // Auth Guard
+  // Auth Guard. logout() already navigates to /auth/login itself, but
+  // setIsLoggedIn(false) also triggers this effect, firing a second
+  // competing router.push - route both to the same flagged URL so whichever
+  // one wins the race still tells the login page to skip auto-restore.
   useEffect(() => {
     if (!loading && !isLoggedIn) {
-      router.push('/auth/login');
+      console.log('[dashboard] auth guard firing, isLoggedIn is false, redirecting');
+      router.push('/auth/login?loggedout=1');
     }
   }, [isLoggedIn, loading, router]);
 
