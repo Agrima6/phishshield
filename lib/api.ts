@@ -459,4 +459,13 @@ export const api = {
       body: formData,
     });
   },
+
+  chatbot: {
+    sendInquiry: async (data: { name: string; phone?: string; email?: string; message: string }) => {
+      return fetcher<{ status: string }>('/api/chatbot/inquiry', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+  },
 };

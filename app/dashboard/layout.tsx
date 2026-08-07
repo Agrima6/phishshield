@@ -32,7 +32,7 @@ import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, API_BASE } from '@/lib/api';
 
 // Tailwind v4's utilities (bg-primary, text-primary, ...) read --color-primary
 // at runtime, so overriding it on the root element re-themes the whole app
@@ -64,6 +64,7 @@ export default function DashboardLayout({
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [sessionTimeoutActive, setSessionTimeoutActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [logoUrl, setLogoUrl] = useState('/workmate-shield-logo.png');
 
   // Notifications state
   const [notifications, setNotifications] = useState([
@@ -117,9 +118,13 @@ export default function DashboardLayout({
           document.documentElement.style.setProperty('--color-primary', color);
           document.documentElement.style.setProperty('--color-primary-hover', darkenHex(color));
         }
+        const customLogo = settings.branding?.logoUrl;
+        if (customLogo) {
+          setLogoUrl(customLogo.startsWith('/') ? `${API_BASE}${customLogo}` : customLogo);
+        }
       })
       .catch(() => {
-        // Tenant settings unreachable — keep the default theme.
+        // Tenant settings unreachable, keep the default theme and logo.
       });
   }, [isLoggedIn, loading]);
 
@@ -235,11 +240,17 @@ export default function DashboardLayout({
           {/* Logo header */}
           <div className="h-16 flex items-center px-6 border-b border-slate-100 justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <Image src="/workmate-shield-logo.png" alt="Workmate Shield" width={44} height={44} className="h-11 w-11 rounded-md shadow-xs shrink-0" />
+              <Image src={logoUrl} alt={tenantName || 'Company logo'} width={44} height={44} className="h-11 w-11 rounded-md shadow-xs shrink-0 object-contain bg-white" unoptimized={logoUrl !== '/workmate-shield-logo.png'} />
               {sidebarOpen && (
-                <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
-                  WORKMATE <span className="text-primary">SHIELD</span>
-                </span>
+                logoUrl === '/workmate-shield-logo.png' ? (
+                  <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
+                    WORKMATE <span className="text-primary">SHIELD</span>
+                  </span>
+                ) : (
+                  <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
+                    {tenantName}
+                  </span>
+                )
               )}
             </div>
             {sidebarOpen && (
@@ -353,6 +364,11 @@ export default function DashboardLayout({
               </button>
             )}
           </div>
+          {sidebarOpen && (
+            <div className="px-4 py-2 text-center border-t border-slate-100 bg-slate-50">
+              <span className="text-[9px] text-slate-400 font-medium">Powered by Workmate Shield</span>
+            </div>
+          )}
         </div>
       </aside>
 

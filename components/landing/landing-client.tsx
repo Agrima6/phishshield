@@ -140,8 +140,10 @@ export default function LandingClient() {
       </section>
 
       {/* Threat is real */}
-      <section className="bg-slate-50 border-y border-slate-100">
-        <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-12 items-stretch">
+      <section className="relative overflow-hidden bg-white border-y border-slate-100">
+        <DotGrid />
+        <div className="pointer-events-none absolute top-0 right-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl animate-[floatSlow_14s_ease-in-out_infinite]" />
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-12 items-stretch">
           <Reveal className="h-full">
             <div className="relative h-full min-h-[320px] rounded-2xl overflow-hidden border border-slate-200 shadow-xl bg-black">
               <video

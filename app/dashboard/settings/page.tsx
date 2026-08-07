@@ -12,8 +12,10 @@ import {
   Lock, 
   ShieldCheck, 
   PlusCircle, 
-  Eye, 
-  EyeOff 
+  Eye,
+  EyeOff,
+  Upload,
+  RefreshCw
 } from 'lucide-react';
 import { TenantSettings, EmailConfig } from '@/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -22,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { api } from '@/lib/api';
+import { api, API_BASE } from '@/lib/api';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
@@ -33,6 +35,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'branding' | 'sso' | 'email'>('branding');
   const [smtpModalOpen, setSmtpModalOpen] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<string | null>(null);
 
@@ -71,6 +74,41 @@ export default function SettingsPage() {
       toast.success('Branding and accent settings updated successfully.');
     } catch (err: any) {
       toast.error('Failed to save branding settings: ' + err.message);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !settings) return;
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('Logo file must be under 3 MB.');
+      return;
+    }
+    setLogoUploading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const res = await api.uploadImage(formData);
+      const updated = { ...settings, branding: { ...settings.branding, logoUrl: res.url } };
+      setSettings(updated);
+      await api.settings.save(updated);
+      toast.success('Logo updated. It now appears in the dashboard and PDF reports.');
+    } catch (err: any) {
+      toast.error('Failed to upload logo: ' + err.message);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!settings) return;
+    const updated = { ...settings, branding: { ...settings.branding, logoUrl: '' } };
+    setSettings(updated);
+    try {
+      await api.settings.save(updated);
+      toast.success('Reverted to the default Workmate Shield logo.');
+    } catch (err: any) {
+      toast.error('Failed to remove logo: ' + err.message);
     }
   };
 
@@ -215,11 +253,38 @@ export default function SettingsPage() {
                     <CardDescription>Customize the console logo and primary styling accent values for this tenant workspace.</CardDescription>
                   </CardHeader>
                   <CardContent>
+                    <div className="mb-6">
+                      <label className="block text-slate-700 mb-1">Company Logo</label>
+                      <p className="text-[10px] text-slate-400 font-normal mb-2">
+                        Shown in the dashboard sidebar and on PDF reports in place of the default Workmate Shield logo. Workmate Shield branding stays visible as &quot;Powered by&quot; text either way.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <div className="h-14 w-14 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={settings.branding.logoUrl ? `${API_BASE}${settings.branding.logoUrl}` : '/workmate-shield-logo.png'}
+                            alt="Current logo"
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors">
+                          {logoUploading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                          {logoUploading ? 'Uploading...' : 'Upload new logo'}
+                          <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={logoUploading} />
+                        </label>
+                        {settings.branding.logoUrl && (
+                          <Button type="button" variant="ghost" size="sm" onClick={handleRemoveLogo}>
+                            Reset to default
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
                     <form onSubmit={handleSaveBranding} className="space-y-4 text-xs font-semibold">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-slate-700 mb-1">Company Workspace Name</label>
-                          <Input 
+                          <Input
                             value={settings.name}
                             onChange={(e) => setSettings({ ...settings, name: e.target.value })}
                           />

@@ -11,7 +11,7 @@ import {
   RadialBarChart, RadialBar, PolarAngleAxis,
   AreaChart, Area,
 } from 'recharts';
-import { api } from '@/lib/api';
+import { api, API_BASE } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -60,17 +60,20 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
 export default function ReportsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [tenantSettings, setTenantSettings] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [camps, emps] = await Promise.all([
+      const [camps, emps, settings] = await Promise.all([
         api.campaigns.list(),
-        api.employees.list()
+        api.employees.list(),
+        api.settings.get()
       ]);
       setCampaigns(camps);
       setEmployees(emps);
+      setTenantSettings(settings);
     } catch (err: any) {
       toast.error('Failed to load reports telemetry: ' + err.message);
     } finally {
@@ -122,7 +125,12 @@ export default function ReportsPage() {
 
     try {
       const doc = new jsPDF();
-      const logoDataUrl = await loadImageAsDataUrl('/workmate-shield-logo.png');
+      const customLogoUrl = tenantSettings?.branding?.logoUrl;
+      const logoSrc = customLogoUrl
+        ? (customLogoUrl.startsWith('/') ? `${API_BASE}${customLogoUrl}` : customLogoUrl)
+        : '/workmate-shield-logo.png';
+      const logoDataUrl = await loadImageAsDataUrl(logoSrc);
+      const companyName = (customLogoUrl && tenantSettings?.name) || 'Workmate Shield';
       let y = 15;
 
       if (logoDataUrl) {
@@ -130,10 +138,10 @@ export default function ReportsPage() {
       }
       doc.setFontSize(16);
       doc.setTextColor(122, 18, 32); // brand maroon
-      doc.text('Workmate Shield', logoDataUrl ? 34 : 14, 20);
+      doc.text(companyName, logoDataUrl ? 34 : 14, 20);
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      doc.text('Security Awareness — Simulation Report', logoDataUrl ? 34 : 14, 26);
+      doc.text('Security Awareness Simulation Report', logoDataUrl ? 34 : 14, 26);
       doc.text(`Generated ${generatedLabel}`, 14, 34);
       y = 42;
 
@@ -193,6 +201,12 @@ export default function ReportsPage() {
         headStyles: { fillColor: [122, 18, 32] },
         footStyles: { fillColor: [240, 230, 231], textColor: [122, 18, 32], fontStyle: 'bold' },
       });
+
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.setFontSize(8);
+      doc.setTextColor(160, 160, 160);
+      doc.text('Powered by Workmate Shield', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
       doc.save(`workmate-shield-report-${dateLabel}.pdf`);
       toast.success('PDF report downloaded.');

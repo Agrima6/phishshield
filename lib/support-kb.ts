@@ -1,10 +1,12 @@
 // Local knowledge base for the in-app "Shieldy" assistant. Deliberately
-// static (no LLM/API call) — the assistant is a guided, option-driven help
+// static (no LLM/API call): the assistant is a guided, option-driven help
 // tree over this content, with a simple local keyword search across all
 // entries standing in for retrieval. If nothing here resolves the user's
-// issue, the widget hands off to SUPPORT_EMAIL.
+// issue, the widget hands off to a human via the contacts below.
 
-export const SUPPORT_EMAIL = 'support@workmateshield.com';
+export const SUPPORT_EMAILS = ['info@wcspl.net', 'support@wcspl.net'];
+export const WHATSAPP_NUMBER = '918527381783';
+export const WHATSAPP_DISPLAY = '+91 85273 81783';
 
 export interface KBEntry {
   q: string;
