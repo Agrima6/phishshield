@@ -152,7 +152,8 @@ function LoginPageInner() {
       });
 
       if (result.status !== 'complete') {
-        toast.error('Additional verification is required for this account, which this console does not yet support.');
+        console.log('[login] sign-in did not complete:', JSON.stringify(result, null, 2));
+        toast.error(`Sign-in status: ${result.status}. See console for details.`);
         return;
       }
 
