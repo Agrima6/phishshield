@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { KeyRound, Mail, Eye, EyeOff, AlertTriangle, RefreshCw } from 'lucide-react';
+import { KeyRound, Mail, Eye, EyeOff, AlertTriangle, RefreshCw, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useSession } from '@/hooks/use-session';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,9 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [clientTrustPending, setClientTrustPending] = useState(false);
+  const [clientTrustCode, setClientTrustCode] = useState('');
+  const [verifyingClientTrust, setVerifyingClientTrust] = useState(false);
 
   const {
     register,
@@ -151,6 +154,22 @@ function LoginPageInner() {
         password: data.password,
       });
 
+      if (result.status === 'needs_client_trust') {
+        // Clerk doesn't yet trust this browser/device and requires a one-time
+        // email code before completing sign-in - a security feature, not an
+        // error. Kick off that verification and show the code-entry screen.
+        const secondFactors = (result as any).supportedSecondFactors || [];
+        const hasEmailCode = secondFactors.some((f: any) => f.strategy === 'email_code');
+        if (!hasEmailCode) {
+          toast.error('This account needs additional verification that this console does not yet support.');
+          return;
+        }
+        await clerk.client.signIn.prepareSecondFactor({ strategy: 'email_code' } as any);
+        setClientTrustPending(true);
+        toast.success('Enter the code we just emailed you to finish signing in.');
+        return;
+      }
+
       if (result.status !== 'complete') {
         console.log('[login] sign-in did not complete:', JSON.stringify(result, null, 2));
         toast.error(`Sign-in status: ${result.status}. See console for details.`);
@@ -185,6 +204,39 @@ function LoginPageInner() {
     }
   };
 
+  const handleVerifyClientTrust = async () => {
+    if (clientTrustCode.length < 6) return;
+    setVerifyingClientTrust(true);
+    try {
+      const result = await clerk.client.signIn.attemptSecondFactor({
+        strategy: 'email_code',
+        code: clientTrustCode,
+      } as any);
+      if (result.status !== 'complete') {
+        console.log('[login] client trust verify result:', JSON.stringify(result, null, 2));
+        toast.error(`Sign-in status: ${result.status}. See console for details.`);
+        return;
+      }
+      await clerk.setActive({ session: result.createdSessionId });
+      await completeSignIn();
+      toast.success('Signed in successfully.');
+    } catch (err: any) {
+      const message = err?.errors?.[0]?.message || err.message || 'Invalid or expired code.';
+      toast.error(message);
+    } finally {
+      setVerifyingClientTrust(false);
+    }
+  };
+
+  const handleResendClientTrustCode = async () => {
+    try {
+      await clerk.client.signIn.prepareSecondFactor({ strategy: 'email_code' } as any);
+      toast.success('Code resent.');
+    } catch {
+      toast.error('Failed to resend code.');
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     if (!isLoaded) {
       toast.error('Still connecting to the authentication service — please try again in a moment.');
@@ -207,6 +259,63 @@ function LoginPageInner() {
       setGoogleLoading(false);
     }
   };
+
+  if (clientTrustPending) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => {
+            setClientTrustPending(false);
+            setClientTrustCode('');
+          }}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors mb-6 cursor-pointer"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back
+        </button>
+
+        <div className="text-center md:text-left mb-6">
+          <div className="inline-flex items-center justify-center p-2 rounded-lg bg-amber-50 text-amber-600 mb-3">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 font-sans">Verify this device</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            We don&apos;t recognize this browser yet. Enter the 6-digit code we just emailed you to finish signing in.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <Input
+            type="text"
+            inputMode="numeric"
+            placeholder="123456"
+            className="text-center tracking-[0.5em] text-lg font-bold"
+            maxLength={6}
+            value={clientTrustCode}
+            onChange={(e) => setClientTrustCode(e.target.value.replace(/[^0-9]/g, ''))}
+          />
+          <Button
+            onClick={handleVerifyClientTrust}
+            className="w-full"
+            disabled={clientTrustCode.length < 6}
+            loading={verifyingClientTrust}
+          >
+            Verify & Sign In
+          </Button>
+          <p className="text-xs text-center text-slate-500">
+            Didn&apos;t get it?{' '}
+            <button
+              onClick={handleResendClientTrustCode}
+              className="text-primary hover:text-primary-hover font-semibold cursor-pointer"
+            >
+              Resend code
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (restoring) {
     return (
