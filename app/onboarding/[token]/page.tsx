@@ -106,7 +106,7 @@ export default function OnboardingPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Headquarters address *</label>
-            <Input placeholder="Street, city, state, postal code" value={address} onChange={(e) => setAddress(e.target.value)} required />
+            <Input placeholder="MG Road, Bengaluru, Karnataka 560001" value={address} onChange={(e) => setAddress(e.target.value)} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

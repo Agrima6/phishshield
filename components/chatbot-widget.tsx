@@ -179,7 +179,7 @@ export function ChatbotWidget() {
                   required
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Jordan Lee"
+                  placeholder="Priya Patel"
                   className="w-full text-xs px-3.5 py-2.5 rounded-lg border border-slate-200 outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -189,7 +189,7 @@ export function ChatbotWidget() {
                   type="tel"
                   value={phoneInput}
                   onChange={(e) => setPhoneInput(e.target.value)}
-                  placeholder="+1 555 123 4567"
+                  placeholder="+91 98765 43210"
                   className="w-full text-xs px-3.5 py-2.5 rounded-lg border border-slate-200 outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -199,7 +199,7 @@ export function ChatbotWidget() {
                   type="email"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="jordan@company.com"
+                  placeholder="priya@company.com"
                   className="w-full text-xs px-3.5 py-2.5 rounded-lg border border-slate-200 outline-none focus:border-primary transition-colors"
                 />
               </div>

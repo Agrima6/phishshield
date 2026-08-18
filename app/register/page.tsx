@@ -69,23 +69,23 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Company name</label>
-            <Input placeholder="Acme Inc." error={!!errors.company_name} {...register('company_name')} />
+            <Input placeholder="Sharma Enterprises Pvt Ltd" error={!!errors.company_name} {...register('company_name')} />
             {errors.company_name && <p className="text-xs text-destructive mt-1">{errors.company_name.message}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Contact person</label>
-            <Input placeholder="Jane Doe" error={!!errors.contact_name} {...register('contact_name')} />
+            <Input placeholder="Aarav Sharma" error={!!errors.contact_name} {...register('contact_name')} />
             {errors.contact_name && <p className="text-xs text-destructive mt-1">{errors.contact_name.message}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Work email</label>
-            <Input type="email" placeholder="jane@acme.com" error={!!errors.contact_email} {...register('contact_email')} />
+            <Input type="email" placeholder="aarav@sharma.com" error={!!errors.contact_email} {...register('contact_email')} />
             {errors.contact_email && <p className="text-xs text-destructive mt-1">{errors.contact_email.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile number</label>
-              <Input placeholder="+1 555 123 4567" {...register('contact_mobile')} />
+              <Input placeholder="+91 98765 43210" {...register('contact_mobile')} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Designation</label>

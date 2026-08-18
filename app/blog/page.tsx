@@ -192,7 +192,7 @@ export default function BlogPage() {
                   <Input
                     value={form.author_name}
                     onChange={(e) => setForm({ ...form, author_name: e.target.value })}
-                    placeholder="Jane Doe"
+                    placeholder="Aarav Sharma"
                   />
                 </div>
                 <div>
@@ -200,7 +200,7 @@ export default function BlogPage() {
                   <Input
                     value={form.author_company}
                     onChange={(e) => setForm({ ...form, author_company: e.target.value })}
-                    placeholder="Acme Inc."
+                    placeholder="Sharma Enterprises Pvt Ltd"
                   />
                 </div>
               </div>

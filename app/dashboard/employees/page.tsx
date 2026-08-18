@@ -291,7 +291,7 @@ export default function EmployeesPage() {
               <label className="block text-slate-700 mb-1">Full Name</label>
               <Input 
                 required
-                placeholder="Jane Doe" 
+                placeholder="Aarav Sharma" 
                 value={newEmp.name}
                 onChange={(e) => setNewEmp({ ...newEmp, name: e.target.value })}
               />
@@ -302,7 +302,7 @@ export default function EmployeesPage() {
               <Input 
                 required
                 type="email"
-                placeholder="jane.doe@company.com" 
+                placeholder="aarav.sharma@company.com" 
                 value={newEmp.email}
                 onChange={(e) => setNewEmp({ ...newEmp, email: e.target.value })}
               />

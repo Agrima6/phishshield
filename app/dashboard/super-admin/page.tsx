@@ -324,7 +324,7 @@ export default function SuperAdminPage() {
                   <Building className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
                   <Input
                     required
-                    placeholder="e.g. Peardo International"
+                    placeholder="e.g. Sharma Enterprises Pvt Ltd"
                     className="pl-9"
                     value={formData.company_name}
                     onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
@@ -337,7 +337,7 @@ export default function SuperAdminPage() {
                 <div className="relative">
                   <User className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
                   <Input
-                    placeholder="e.g. Jordan Lee"
+                    placeholder="e.g. Priya Patel"
                     className="pl-9"
                     value={formData.contact_name}
                     onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
@@ -352,7 +352,7 @@ export default function SuperAdminPage() {
                   <Input
                     required
                     type="email"
-                    placeholder="ops@peardo.com"
+                    placeholder="ops@sharma.com"
                     className="pl-9"
                     value={formData.contact_email}
                     onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
@@ -365,7 +365,7 @@ export default function SuperAdminPage() {
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
                   <Input
-                    placeholder="+1 555 123 4567"
+                    placeholder="+91 98765 43210"
                     className="pl-9"
                     value={formData.contact_mobile}
                     onChange={(e) => setFormData({ ...formData, contact_mobile: e.target.value })}
@@ -398,7 +398,7 @@ export default function SuperAdminPage() {
                   <Input
                     required
                     type="email"
-                    placeholder="admin@peardo.com"
+                    placeholder="admin@sharma.com"
                     className="pl-9"
                     value={formData.admin_email}
                     onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}

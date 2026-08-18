@@ -527,7 +527,7 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-slate-700 mb-1">Username / Auth Account</label>
                     <Input 
-                      placeholder="alerts@company.com" 
+                      placeholder="alerts@sharma.com" 
                       value={newProfile.username}
                       onChange={(e) => setNewProfile({ ...newProfile, username: e.target.value })}
                     />
@@ -561,7 +561,7 @@ export default function SettingsPage() {
                 <Input 
                   required
                   type="email"
-                  placeholder="security-audit@company.com" 
+                  placeholder="security-audit@sharma.com" 
                   value={newProfile.fromEmail}
                   onChange={(e) => setNewProfile({ ...newProfile, fromEmail: e.target.value })}
                 />
