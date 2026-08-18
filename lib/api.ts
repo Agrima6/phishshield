@@ -61,6 +61,13 @@ export function mapBackendToTenantSettings(backend: any): TenantSettings {
       fromName: ec.provider === 'sendgrid' ? ec.sendgrid_from_name : ec.smtp_from_name,
       isConfigured: ec.provider === 'sendgrid' ? ec.sendgrid_api_key_configured : ec.smtp_password_configured,
     })),
+    whatsappConfigs: (backend.whatsapp_configs || []).map((wc: any) => ({
+      id: wc.id,
+      name: wc.name,
+      accountSid: wc.account_sid || '',
+      fromNumber: wc.from_number || '',
+      isConfigured: !!wc.is_configured,
+    })),
   };
 }
 
@@ -101,9 +108,12 @@ export function mapBackendToCampaign(backend: any): Campaign {
     id: backend.id || backend._id,
     name: backend.name,
     status: backend.status || 'draft',
+    channel: backend.channel || 'email',
     subject: backend.subject,
     senderName: backend.sender_name || 'Security Team',
     emailConfigId: backend.email_config_id || undefined,
+    whatsappConfigId: backend.whatsapp_config_id || undefined,
+    messageBody: backend.message_body || undefined,
     scheduledAt: backend.scheduled_at || undefined,
     sentCount: backend.total_sent || 0,
     openedCount: backend.total_opened || 0,
@@ -114,33 +124,35 @@ export function mapBackendToCampaign(backend: any): Campaign {
 
 export const api = {
   auth: {
-    // Exchanges a verified Clerk session token for the Flask session that
-    // _get_session_info() in app.py actually checks on every later request.
-    establishSession: async (clerkToken: string) => {
+    // Custom email/password login - returns a signed JWT that
+    // _get_session_info() in app.py verifies on every later request.
+    login: async (email: string, password: string) => {
       const res = await fetcher<{
-        id: string;
-        name: string;
+        token: string;
         email: string;
+        name: string;
         role: string;
-      }>('/api/auth/clerk/session', {
+        tenant_id: string;
+        must_change_password: boolean;
+      }>('/api/auth/login', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${clerkToken}` },
+        body: JSON.stringify({ email, password }),
       });
 
-      // _get_session_info() only accepts the literal string "clerk" here — the
-      // real credential is the Flask session cookie set by the call above.
-      localStorage.setItem('phish_session_token', 'clerk');
-      localStorage.setItem('phish_username', res.email || res.name);
+      localStorage.setItem('phish_session_token', res.token);
+      localStorage.setItem('phish_username', res.email);
+      localStorage.setItem('phish_display_name', res.name);
       localStorage.setItem('phish_role', res.role);
-      localStorage.setItem('phish_tenant', 'default');
-      localStorage.setItem('phish_tenant_name', 'Default Tenant');
+      localStorage.setItem('phish_tenant', res.tenant_id);
+      localStorage.setItem('phish_tenant_name', res.tenant_id === 'default' ? 'Default Tenant' : res.name);
 
       return res;
     },
     logout: async () => {
-      await fetcher('/api/auth/clerk/logout', { method: 'POST' }).catch(() => {});
+      await fetcher('/api/auth/logout', { method: 'POST' }).catch(() => {});
       localStorage.removeItem('phish_session_token');
       localStorage.removeItem('phish_username');
+      localStorage.removeItem('phish_display_name');
       localStorage.removeItem('phish_role');
       localStorage.removeItem('phish_tenant');
       localStorage.removeItem('phish_tenant_name');
@@ -151,8 +163,77 @@ export const api = {
         label: string;
         username: string;
         tenant_id: string;
-        tenant_name: string;
-      }>('/api/phish/me');
+      }>('/api/auth/me');
+    },
+    changePassword: async (currentPassword: string, newPassword: string) => {
+      return fetcher<{ changed: boolean }>('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      });
+    },
+  },
+
+  registration: {
+    register: async (data: {
+      company_name: string;
+      contact_name: string;
+      contact_email: string;
+      contact_mobile?: string;
+      designation?: string;
+    }) => {
+      return fetcher<{ id: string; company_name: string; email_warning?: string }>('/api/public/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    getOnboarding: async (token: string) => {
+      return fetcher<{
+        company_name: string;
+        contact_name: string;
+        contact_email: string;
+        contact_mobile: string;
+        designation: string;
+        status: string;
+      }>(`/api/public/onboarding/${token}`);
+    },
+    submitOnboarding: async (
+      token: string,
+      data: { address: string; gst_number?: string; employee_count?: string; logo_url?: string; primary_color?: string }
+    ) => {
+      return fetcher<{ status: string }>(`/api/public/onboarding/${token}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    uploadLogo: async (token: string, file: File) => {
+      const formData = new FormData();
+      formData.append('logo', file);
+      return fetcher<{ url: string }>(`/api/public/onboarding/${token}/logo`, {
+        method: 'POST',
+        body: formData,
+      });
+    },
+  },
+
+  adminRegistrations: {
+    list: async (status?: string) => {
+      const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+      return fetcher<any[]>(`/api/admin/registrations${qs}`);
+    },
+    get: async (id: string) => {
+      return fetcher<any>(`/api/admin/registrations/${id}`);
+    },
+    approve: async (id: string) => {
+      return fetcher<{ tenant: any; user_email: string; email_warning?: string }>(
+        `/api/admin/registrations/${id}/approve`,
+        { method: 'POST' }
+      );
+    },
+    reject: async (id: string, reason?: string) => {
+      return fetcher<any>(`/api/admin/registrations/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason || '' }),
+      });
     },
   },
   

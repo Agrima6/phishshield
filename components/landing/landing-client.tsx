@@ -130,7 +130,7 @@ export default function LandingClient() {
             </p>
             <div className="flex flex-wrap items-center gap-4 animate-[fadeInUp_0.7s_ease-out_0.3s_both]">
               <Link
-                href="/auth/login"
+                href="/register"
                 className="group relative overflow-hidden inline-flex items-center gap-2 text-sm font-bold px-6 py-3.5 rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
               >
                 <span className="relative z-10 flex items-center gap-2">

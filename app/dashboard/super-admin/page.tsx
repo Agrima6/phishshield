@@ -10,7 +10,24 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { ShieldCheck, Building, Plus, Mail, Phone, Briefcase, ShieldAlert, Calendar, Send, Users, UserPlus, Trash2, Pencil, User } from 'lucide-react';
+import { ShieldCheck, Building, Plus, Mail, Phone, Briefcase, ShieldAlert, Calendar, Send, Users, Trash2, Pencil, User, CheckCircle2, XCircle, ClipboardList } from 'lucide-react';
+
+interface RegistrationRow {
+  id: string;
+  company_name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_mobile: string;
+  designation: string;
+  status: string;
+  address: string;
+  gst_number: string;
+  employee_count: string;
+  logo_url: string;
+  primary_color: string;
+  created_at: string;
+  submitted_at: string | null;
+}
 
 interface TenantRow {
   id: string;
@@ -50,10 +67,10 @@ export default function SuperAdminPage() {
 
   const [formData, setFormData] = useState(emptyForm);
 
-  const [allowlist, setAllowlist] = useState<AllowlistEntry[]>([]);
-  const [allowlistLoading, setAllowlistLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviting, setInviting] = useState(false);
+  const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
+  const [registrationsLoading, setRegistrationsLoading] = useState(true);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   const [editTarget, setEditTarget] = useState<TenantRow | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
@@ -63,15 +80,15 @@ export default function SuperAdminPage() {
 
   const isSuperAdmin = role === 'super_admin';
 
-  const loadAllowlist = async () => {
-    setAllowlistLoading(true);
+  const loadRegistrations = async () => {
+    setRegistrationsLoading(true);
     try {
-      const data = await api.admin.allowlist.list();
-      setAllowlist(data);
+      const data = await api.adminRegistrations.list();
+      setRegistrations(data);
     } catch (err: any) {
-      toast.error('Failed to load authorized sign-up emails: ' + err.message);
+      toast.error('Failed to load registrations: ' + err.message);
     } finally {
-      setAllowlistLoading(false);
+      setRegistrationsLoading(false);
     }
   };
 
@@ -89,34 +106,40 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    loadAllowlist();
+    loadRegistrations();
     loadTenants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperAdmin]);
 
-  const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteEmail.trim()) return;
-    setInviting(true);
+  const handleApprove = async (reg: RegistrationRow) => {
+    setApprovingId(reg.id);
     try {
-      await api.admin.allowlist.add(inviteEmail.trim());
-      toast.success(`${inviteEmail.trim()} can now create an account.`);
-      setInviteEmail('');
-      loadAllowlist();
+      const result = await api.adminRegistrations.approve(reg.id);
+      if (result.email_warning) {
+        toast.warning(result.email_warning);
+      } else {
+        toast.success(`${reg.company_name} approved. Login details sent to ${result.user_email}.`);
+      }
+      loadRegistrations();
+      loadTenants();
     } catch (err: any) {
-      toast.error('Failed to authorize email: ' + err.message);
+      toast.error('Failed to approve: ' + err.message);
     } finally {
-      setInviting(false);
+      setApprovingId(null);
     }
   };
 
-  const handleRevoke = async (id: string, identifier: string) => {
+  const handleReject = async (reg: RegistrationRow) => {
+    const reason = window.prompt(`Reason for rejecting ${reg.company_name}? (optional)`) || '';
+    setRejectingId(reg.id);
     try {
-      await api.admin.allowlist.remove(id);
-      toast.success(`Revoked access for ${identifier}.`);
-      loadAllowlist();
+      await api.adminRegistrations.reject(reg.id, reason);
+      toast.success(`${reg.company_name} rejected.`);
+      loadRegistrations();
     } catch (err: any) {
-      toast.error('Failed to revoke: ' + err.message);
+      toast.error('Failed to reject: ' + err.message);
+    } finally {
+      setRejectingId(null);
     }
   };
 
@@ -209,53 +232,75 @@ export default function SuperAdminPage() {
         </div>
       </div>
 
-      {/* Authorized Sign-Up Emails */}
+      {/* Pending Registrations (maker-checker review) */}
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <UserPlus className="h-4 w-4 text-primary" /> Authorized Sign-Up Emails
+            <ClipboardList className="h-4 w-4 text-primary" /> Company Registrations
           </CardTitle>
           <CardDescription className="text-xs">
-            Public sign-up is disabled, only emails added here can create an account. Add a colleague&apos;s
-            work email below, and they&apos;ll be able to register themselves at the sign-up page.
+            Companies that registered themselves and completed onboarding, awaiting your approval. Approving
+            creates their tenant and emails their first admin a login.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleInvite} className="flex items-center gap-2 mb-4">
-            <div className="relative flex-1">
-              <Mail className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
-              <Input
-                type="email"
-                required
-                placeholder="colleague@yourcompany.com"
-                className="pl-9"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-              />
-            </div>
-            <Button type="submit" loading={inviting} className="shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" /> Authorize
-            </Button>
-          </form>
-
-          {allowlistLoading ? (
-            <div className="flex items-center gap-2 text-xs text-slate-400 py-4">
+        <CardContent className="p-0">
+          {registrationsLoading ? (
+            <div className="flex items-center gap-2 text-xs text-slate-400 py-8 justify-center">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Loading authorized emails...
+              Loading registrations...
             </div>
-          ) : allowlist.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">No emails authorized yet. Add one above to let them sign up.</p>
+          ) : registrations.length === 0 ? (
+            <p className="text-xs text-slate-400 py-8 text-center">No registrations yet.</p>
           ) : (
-            <div className="space-y-2">
-              {allowlist.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between p-2.5 border border-slate-200 rounded-lg text-xs">
-                  <span className="font-semibold text-slate-800">{entry.identifier}</span>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-destructive" onClick={() => handleRevoke(entry.id, entry.identifier)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {registrations.map((reg) => (
+                  <TableRow key={reg.id}>
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-2">
+                        {reg.logo_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={reg.logo_url} alt="" className="h-6 w-6 rounded object-cover border border-slate-200" />
+                        )}
+                        <div>
+                          <div className="font-semibold text-slate-900">{reg.company_name}</div>
+                          <div className="text-[10px] text-slate-400">{reg.designation}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-slate-600 text-xs py-3">
+                      <div>{reg.contact_name}</div>
+                      <div className="text-[10px] text-slate-400">{reg.contact_email}</div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant={reg.status === 'SUBMITTED' ? 'info' : reg.status === 'APPROVED' ? 'success' : reg.status === 'REJECTED' ? 'danger' : 'secondary'} className="text-[10px]">
+                        {reg.status.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right py-3">
+                      {reg.status === 'SUBMITTED' && (
+                        <div className="flex justify-end gap-1.5">
+                          <Button size="sm" className="h-7 text-[11px]" loading={approvingId === reg.id} onClick={() => handleApprove(reg)}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-[11px] text-destructive hover:text-destructive" loading={rejectingId === reg.id} onClick={() => handleReject(reg)}>
+                            <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useClerk } from '@clerk/nextjs';
 import { api } from '@/lib/api';
 
 export function useSession() {
-  const clerk = useClerk();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
   const [displayName, setDisplayName] = useState<string>('');
@@ -89,22 +87,6 @@ export function useSession() {
     } catch {
       // ignore
     }
-    try {
-      // Must end the Clerk-level session too — otherwise /auth/login's
-      // auto-restore (needed for single-session-mode) immediately re-signs
-      // you back in the instant you land there, making logout a no-op.
-      await clerk.signOut();
-    } catch {
-      // ignore
-    }
-    // Belt-and-suspenders: Clerk's signed-out state can take a tick to
-    // propagate through React context, so the login page's isSignedIn check
-    // may still read stale (true) right as it mounts. This flag (and the
-    // ?loggedout=1 query param below) lets the login page skip auto-restore
-    // unconditionally right after a deliberate logout, regardless of that
-    // timing race.
-    sessionStorage.setItem('phish_just_logged_out', '1');
-    console.log('[logout] clerk.signOut() awaited, flag set, redirecting to /auth/login?loggedout=1');
     localStorage.removeItem('phish_session_token');
     localStorage.removeItem('phish_username');
     localStorage.removeItem('phish_display_name');

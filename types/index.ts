@@ -10,6 +10,14 @@ export interface EmailConfig {
   isConfigured: boolean;
 }
 
+export interface WhatsAppConfig {
+  id: string;
+  name: string;
+  accountSid: string;
+  fromNumber: string;
+  isConfigured: boolean;
+}
+
 export interface TenantSettings {
   id: string;
   name: string;
@@ -25,15 +33,19 @@ export interface TenantSettings {
     enabled: boolean;
   };
   emailConfigs: EmailConfig[];
+  whatsappConfigs: WhatsAppConfig[];
 }
 
 export interface Campaign {
   id: string;
   name: string;
   status: 'active' | 'draft' | 'completed';
+  channel: 'email' | 'whatsapp';
   subject: string;
   senderName: string;
   emailConfigId?: string;
+  whatsappConfigId?: string;
+  messageBody?: string;
   scheduledAt?: string;
   sentCount: number;
   openedCount: number;
@@ -45,6 +57,7 @@ export interface Employee {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   department: string;
   manager: string;
   riskRating: 'low' | 'medium' | 'high';
@@ -56,6 +69,7 @@ export interface PhishingTemplate {
   id: string;
   name: string;
   category: 'credential-harvester' | 'link-click' | 'malicious-attachment';
+  channel: 'email' | 'whatsapp';
   thumbnail: string;
   description: string;
   subject: string;
