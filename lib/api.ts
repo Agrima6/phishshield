@@ -397,6 +397,9 @@ export const api = {
       list: async () => {
         return fetcher<any[]>('/api/admin/tenants');
       },
+      get: async (id: string) => {
+        return fetcher<any>(`/api/admin/tenants/${id}`);
+      },
       create: async (data: {
         company_name: string;
         contact_name?: string;

@@ -66,6 +66,9 @@ export default function DashboardLayout({
   const [sessionTimeoutActive, setSessionTimeoutActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [logoUrl, setLogoUrl] = useState('/workmate-shield-logo.png');
+  // Avoids a flash of the default Workmate Shield logo before the tenant's
+  // own branding (fetched async below) has a chance to load in.
+  const [brandingReady, setBrandingReady] = useState(false);
 
   // Notifications state
   const [notifications, setNotifications] = useState([
@@ -130,7 +133,8 @@ export default function DashboardLayout({
       })
       .catch(() => {
         // Tenant settings unreachable, keep the default theme and logo.
-      });
+      })
+      .finally(() => setBrandingReady(true));
   }, [isLoggedIn, loading]);
 
   // Command palette listener (⌘K or Ctrl+K)
@@ -246,9 +250,15 @@ export default function DashboardLayout({
           {/* Logo header */}
           <div className="h-16 flex items-center px-6 border-b border-slate-100 justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <Image src={logoUrl} alt={tenantName || 'Company logo'} width={44} height={44} className="h-11 w-11 rounded-md shadow-xs shrink-0 object-contain bg-white" unoptimized={logoUrl !== '/workmate-shield-logo.png'} />
+              {brandingReady ? (
+                <Image src={logoUrl} alt={tenantName || 'Company logo'} width={44} height={44} className="h-11 w-11 rounded-md shadow-xs shrink-0 object-contain bg-white" unoptimized={logoUrl !== '/workmate-shield-logo.png'} />
+              ) : (
+                <div className="h-11 w-11 rounded-md shrink-0 bg-slate-100 animate-pulse" />
+              )}
               {sidebarOpen && (
-                logoUrl === '/workmate-shield-logo.png' ? (
+                !brandingReady ? (
+                  <div className="h-3 w-24 rounded bg-slate-100 animate-pulse" />
+                ) : logoUrl === '/workmate-shield-logo.png' ? (
                   <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
                     WORKMATE <span className="text-primary">SHIELD</span>
                   </span>

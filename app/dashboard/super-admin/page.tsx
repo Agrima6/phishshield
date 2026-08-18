@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { ShieldCheck, Building, Plus, Mail, Phone, Briefcase, ShieldAlert, Calendar, Send, Users, Trash2, Pencil, User, CheckCircle2, XCircle, ClipboardList } from 'lucide-react';
+import { ShieldCheck, Building, Plus, Mail, Phone, Briefcase, ShieldAlert, Calendar, Send, Users, Trash2, Pencil, User, CheckCircle2, XCircle, ClipboardList, Eye, MapPin, FileText, Palette } from 'lucide-react';
 
 interface RegistrationRow {
   id: string;
@@ -71,6 +71,10 @@ export default function SuperAdminPage() {
   const [registrationsLoading, setRegistrationsLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  const [viewTarget, setViewTarget] = useState<TenantRow | null>(null);
+  const [viewDetail, setViewDetail] = useState<any>(null);
+  const [viewLoading, setViewLoading] = useState(false);
 
   const [editTarget, setEditTarget] = useState<TenantRow | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
@@ -163,6 +167,19 @@ export default function SuperAdminPage() {
       toast.error('Failed to onboard company: ' + err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openView = async (t: TenantRow) => {
+    setViewTarget(t);
+    setViewLoading(true);
+    try {
+      const detail = await api.admin.tenants.get(t.id);
+      setViewDetail(detail);
+    } catch (err: any) {
+      toast.error('Failed to load company details: ' + err.message);
+    } finally {
+      setViewLoading(false);
     }
   };
 
@@ -475,6 +492,9 @@ export default function SuperAdminPage() {
                     </TableCell>
                     <TableCell className="text-right py-3">
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => openView(t)}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => openEdit(t)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -497,6 +517,111 @@ export default function SuperAdminPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Company Detail Dialog */}
+      <Dialog open={!!viewTarget} onOpenChange={(open) => { if (!open) { setViewTarget(null); setViewDetail(null); } }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {viewDetail?.logo_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={viewDetail.logo_url} alt="" className="h-6 w-6 rounded object-cover border border-slate-200" />
+              )}
+              {viewTarget?.company_name}
+            </DialogTitle>
+            <DialogDescription>Full onboarding details and account summary.</DialogDescription>
+          </DialogHeader>
+
+          {viewLoading ? (
+            <div className="flex items-center gap-2 text-xs text-slate-400 py-10 justify-center">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Loading...
+            </div>
+          ) : viewDetail ? (
+            <div className="space-y-4 text-xs">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Contact</span>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <User className="h-3.5 w-3.5 text-slate-400 shrink-0" /> {viewDetail.contact_name || '-'}
+                    {viewDetail.designation && <span className="text-slate-400">· {viewDetail.designation}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" /> {viewDetail.admin_email}
+                  </div>
+                  {viewDetail.contact_mobile && (
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" /> {viewDetail.contact_mobile}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Business details</span>
+                <div className="space-y-1.5">
+                  <div className="flex items-start gap-2 text-slate-700">
+                    <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    {viewDetail.registration?.address || 'Not provided'}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    GST: {viewDetail.registration?.gst_number || 'Not provided'}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    {viewDetail.registration?.employee_count || '-'} employees (declared at onboarding)
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Palette className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <span className="inline-block h-3.5 w-3.5 rounded-full border border-slate-200" style={{ backgroundColor: viewDetail.primary_color }} />
+                    {viewDetail.primary_color}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Account</span>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    Onboarded {viewDetail.created_at ? new Date(viewDetail.created_at).toLocaleDateString() : 'N/A'}
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    {viewDetail.employees?.length || 0} employees added, {viewTarget?.campaign_count ?? 0} campaigns run
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={viewDetail.status === 'active' ? 'success' : 'secondary'} className="text-[10px]">{viewDetail.status}</Badge>
+                  </div>
+                </div>
+              </div>
+
+              {viewDetail.employees?.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                    Employees ({viewDetail.employees.length})
+                  </span>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {viewDetail.employees.map((e: any) => (
+                      <div key={e.id} className="flex items-center justify-between p-1.5 border border-slate-100 rounded text-[11px]">
+                        <span className="font-medium text-slate-800">{e.name}</span>
+                        <span className="text-slate-400">{e.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 py-6 text-center">Couldn&apos;t load details.</p>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => { setViewTarget(null); setViewDetail(null); }}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Company Dialog */}
       <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
