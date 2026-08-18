@@ -236,7 +236,22 @@ export const api = {
       });
     },
   },
-  
+
+  team: {
+    list: async () => {
+      return fetcher<any[]>('/api/tenant/team');
+    },
+    invite: async (data: { name: string; email: string; role: string }) => {
+      return fetcher<any>('/api/tenant/team', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    remove: async (userId: string) => {
+      return fetcher<{ deleted: boolean }>(`/api/tenant/team/${userId}`, { method: 'DELETE' });
+    },
+  },
+
   analytics: {
     overview: async () => {
       return fetcher<{
