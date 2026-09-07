@@ -133,6 +133,7 @@ export const api = {
         name: string;
         role: string;
         tenant_id: string;
+        company_name: string;
         must_change_password: boolean;
       }>('/api/auth/login', {
         method: 'POST',
@@ -144,7 +145,7 @@ export const api = {
       localStorage.setItem('phish_display_name', res.name);
       localStorage.setItem('phish_role', res.role);
       localStorage.setItem('phish_tenant', res.tenant_id);
-      localStorage.setItem('phish_tenant_name', res.tenant_id === 'default' ? 'Default Tenant' : res.name);
+      localStorage.setItem('phish_tenant_name', res.company_name || 'Default Tenant');
 
       return res;
     },

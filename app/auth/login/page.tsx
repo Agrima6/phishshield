@@ -46,7 +46,7 @@ function LoginPageInner() {
     setLoading(true);
     try {
       const res = await api.auth.login(data.email, data.password);
-      login(res.token, res.email, res.role, res.tenant_id, res.tenant_id === 'default' ? 'Default Tenant' : res.name, res.name);
+      login(res.token, res.email, res.role, res.tenant_id, res.company_name || 'Default Tenant', res.name);
       toast.success('Signed in successfully.');
       if (res.must_change_password) {
         router.push('/auth/change-password');
