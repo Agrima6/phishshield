@@ -473,6 +473,20 @@ export const api = {
         body: JSON.stringify(data),
       });
     },
+    update: async (id: string, data: {
+      name: string;
+      category: string;
+      theme?: string;
+      subject: string;
+      body: string;
+      description?: string;
+      thumbnail?: string;
+    }) => {
+      return fetcher<any>(`/api/phish/templates/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
     delete: async (id: string) => {
       return fetcher<any>(`/api/phish/templates/${id}`, {
         method: 'DELETE',

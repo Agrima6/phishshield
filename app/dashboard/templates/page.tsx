@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  FileCode, 
-  Plus, 
-  Search, 
-  Eye, 
-  Trash2, 
-  CheckCircle2, 
+import {
+  FileCode,
+  Plus,
+  Search,
+  Eye,
+  Pencil,
+  Trash2,
+  CheckCircle2,
   AlertTriangle,
   Upload,
   Sparkles,
@@ -49,6 +50,20 @@ export default function TemplatesPage() {
   // Image Upload State
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string>('');
+
+  // Edit Modal State
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string>('');
+  const [editUploading, setEditUploading] = useState(false);
+  const [editTemp, setEditTemp] = useState({
+    name: '',
+    category: 'credential-harvester',
+    theme: THEME_OPTIONS[0],
+    subject: '',
+    body: '',
+    description: '',
+    thumbnail: ''
+  });
 
   // AI Occasion Generator State
   const [generating, setGenerating] = useState(false);
@@ -161,6 +176,70 @@ export default function TemplatesPage() {
       loadTemplates();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create template.');
+    }
+  };
+
+  const handleOpenEdit = (temp: any) => {
+    setEditingId(temp._id || temp.id);
+    setEditTemp({
+      name: temp.name || '',
+      category: temp.category || 'credential-harvester',
+      theme: temp.theme || THEME_OPTIONS[0],
+      subject: temp.subject || '',
+      body: temp.body || '',
+      description: temp.description || '',
+      thumbnail: temp.thumbnail || ''
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size exceeds the 5 MB limit.');
+      return;
+    }
+
+    setEditUploading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const res = await api.uploadImage(formData);
+      setEditTemp(prev => ({ ...prev, thumbnail: res.url }));
+      toast.success('Template image uploaded successfully.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload image.');
+    } finally {
+      setEditUploading(false);
+    }
+  };
+
+  const handleUpdateTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTemp.name || !editTemp.subject || !editTemp.body) {
+      toast.error('Template name, subject, and body content are required.');
+      return;
+    }
+
+    try {
+      await api.templates.update(editingId, {
+        name: editTemp.name,
+        category: editTemp.category,
+        theme: editTemp.theme,
+        subject: editTemp.subject,
+        body: editTemp.body,
+        description: editTemp.description,
+        thumbnail: editTemp.thumbnail
+      });
+
+      toast.success(`Simulation Template "${editTemp.name}" updated successfully.`);
+      setEditOpen(false);
+      loadTemplates();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update template.');
     }
   };
 
@@ -326,9 +405,19 @@ export default function TemplatesPage() {
                 </Button>
                 <div className="flex gap-2">
                   {!temp.is_global && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenEdit(temp)}
+                      className="text-slate-500 hover:text-slate-700 hover:bg-slate-100 h-8 w-8"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {!temp.is_global && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleDeleteTemplate(temp._id || temp.id)}
                       className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8"
                     >
@@ -376,6 +465,125 @@ export default function TemplatesPage() {
               Close Preview
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Simulation Template</DialogTitle>
+            <DialogDescription>Update the subject, body, and other details of this template.</DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateTemplate} className="space-y-4 text-xs font-semibold">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1">Scenario Label Name</label>
+                <Input
+                  required
+                  placeholder="e.g. ADP Portal Payroll Lockout"
+                  value={editTemp.name}
+                  onChange={(e) => setEditTemp({ ...editTemp, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Delivery Type</label>
+                <Select
+                  value={editTemp.category}
+                  onChange={(e) => setEditTemp({ ...editTemp, category: e.target.value })}
+                >
+                  <option value="credential-harvester">Credential Harvester</option>
+                  <option value="link-click">Link Click</option>
+                  <option value="malicious-attachment">Malicious Attachment</option>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Theme</label>
+              <Select
+                value={editTemp.theme}
+                onChange={(e) => setEditTemp({ ...editTemp, theme: e.target.value })}
+              >
+                {THEME_OPTIONS.map((theme) => (
+                  <option key={theme} value={theme}>{theme}</option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div>
+                <label className="block text-slate-700 mb-1">Brief Description</label>
+                <Input
+                  placeholder="Checks if employees will click on payroll verification triggers."
+                  value={editTemp.description}
+                  onChange={(e) => setEditTemp({ ...editTemp, description: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Template Header Image / Icon</label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEditImageUpload}
+                      className="hidden"
+                      id="edit-template-image-file"
+                    />
+                    <label
+                      htmlFor="edit-template-image-file"
+                      className="flex items-center justify-center gap-1.5 p-2 border border-dashed border-slate-300 rounded-md cursor-pointer hover:bg-slate-50 transition-colors bg-white font-medium text-slate-600"
+                    >
+                      {editUploading ? (
+                        <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                      ) : (
+                        <Upload className="h-4 w-4 text-slate-400" />
+                      )}
+                      {editUploading ? 'Uploading...' : 'Upload Image'}
+                    </label>
+                  </div>
+                  {editTemp.thumbnail && (
+                    <div className="w-10 h-10 shrink-0">{getThumbnailElement(editTemp.thumbnail)}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Email Subject Header</label>
+              <Input
+                required
+                placeholder="Urgent: Verify your ADP payroll bank information"
+                value={editTemp.subject}
+                onChange={(e) => setEditTemp({ ...editTemp, subject: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Email Body Content</label>
+              <textarea
+                required
+                rows={5}
+                className="w-full border border-slate-200 bg-background rounded-md p-2 outline-hidden font-normal text-slate-800"
+                placeholder="Write your email body copy here. Direct links will automatically be attached to primary action buttons."
+                value={editTemp.body}
+                onChange={(e) => setEditTemp({ ...editTemp, body: e.target.value })}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm">
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
