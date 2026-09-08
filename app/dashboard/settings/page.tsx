@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<string | null>(null);
+  const [testingEmail, setTestingEmail] = useState(false);
 
   // New Email Profile Form
   const [newProfile, setNewProfile] = useState({
@@ -168,6 +169,31 @@ export default function SettingsPage() {
       toast.success(`Sender profile "${created.name}" configured successfully!`);
     } catch (err: any) {
       toast.error('Failed to create sender profile: ' + err.message);
+    }
+  };
+
+  const handleTestEmailProfile = async () => {
+    const recipient = newProfile.fromEmail;
+    if (newProfile.provider === 'smtp' ? (!newProfile.host || !newProfile.username || !newProfile.password) : !newProfile.password) {
+      toast.error('Fill in the connection details above before sending a test.');
+      return;
+    }
+    if (!recipient) {
+      toast.error('Sender Address is required to send the test to.');
+      return;
+    }
+    setTestingEmail(true);
+    try {
+      const result = await api.settings.testEmail('test', newProfile.provider, newProfile, recipient);
+      if (result.success) {
+        toast.success(result.message || `Test email sent to ${recipient}.`);
+      } else {
+        toast.error(result.error || 'Test email failed - check the connection details.');
+      }
+    } catch (err: any) {
+      toast.error('Failed to reach the server: ' + err.message);
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -579,6 +605,9 @@ export default function SettingsPage() {
             <DialogFooter>
               <Button type="button" variant="ghost" size="sm" onClick={() => setSmtpModalOpen(false)}>
                 Cancel
+              </Button>
+              <Button type="button" variant="outline" size="sm" loading={testingEmail} onClick={handleTestEmailProfile}>
+                Send Test Email
               </Button>
               <Button type="submit" size="sm">
                 Save & Encrypt Profile
