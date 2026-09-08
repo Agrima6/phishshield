@@ -54,6 +54,9 @@ export default function TemplatesPage() {
   // Edit Modal State
   const [editOpen, setEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<string>('');
+  // 'update' edits a custom template in place; 'clone' forks a (typically
+  // global, read-only) template into a new custom one owned by this tenant.
+  const [editMode, setEditMode] = useState<'update' | 'clone'>('update');
   const [editUploading, setEditUploading] = useState(false);
   const [editTemp, setEditTemp] = useState({
     name: '',
@@ -180,9 +183,27 @@ export default function TemplatesPage() {
   };
 
   const handleOpenEdit = (temp: any) => {
+    setEditMode('update');
     setEditingId(temp._id || temp.id);
     setEditTemp({
       name: temp.name || '',
+      category: temp.category || 'credential-harvester',
+      theme: temp.theme || THEME_OPTIONS[0],
+      subject: temp.subject || '',
+      body: temp.body || '',
+      description: temp.description || '',
+      thumbnail: temp.thumbnail || ''
+    });
+    setEditOpen(true);
+  };
+
+  // Global templates are shared/read-only - "editing" one forks it into a
+  // new custom template owned by this tenant instead of changing it in place.
+  const handleOpenClone = (temp: any) => {
+    setEditMode('clone');
+    setEditingId('');
+    setEditTemp({
+      name: `${temp.name || 'Untitled'} (Copy)`,
       category: temp.category || 'credential-harvester',
       theme: temp.theme || THEME_OPTIONS[0],
       subject: temp.subject || '',
@@ -225,7 +246,7 @@ export default function TemplatesPage() {
     }
 
     try {
-      await api.templates.update(editingId, {
+      const payload = {
         name: editTemp.name,
         category: editTemp.category,
         theme: editTemp.theme,
@@ -233,13 +254,18 @@ export default function TemplatesPage() {
         body: editTemp.body,
         description: editTemp.description,
         thumbnail: editTemp.thumbnail
-      });
-
-      toast.success(`Simulation Template "${editTemp.name}" updated successfully.`);
+      };
+      if (editMode === 'clone') {
+        await api.templates.create(payload);
+        toast.success(`Saved "${editTemp.name}" as a new custom template.`);
+      } else {
+        await api.templates.update(editingId, payload);
+        toast.success(`Simulation Template "${editTemp.name}" updated successfully.`);
+      }
       setEditOpen(false);
       loadTemplates();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update template.');
+      toast.error(err.message || (editMode === 'clone' ? 'Failed to save template.' : 'Failed to update template.'));
     }
   };
 
@@ -404,25 +430,35 @@ export default function TemplatesPage() {
                   <Eye className="h-3.5 w-3.5" /> Preview
                 </Button>
                 <div className="flex gap-2">
-                  {!temp.is_global && (
+                  {temp.is_global ? (
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleOpenEdit(temp)}
+                      onClick={() => handleOpenClone(temp)}
+                      title="Edit as a new custom template"
                       className="text-slate-500 hover:text-slate-700 hover:bg-slate-100 h-8 w-8"
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                  )}
-                  {!temp.is_global && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteTemplate(temp._id || temp.id)}
-                      className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(temp)}
+                        className="text-slate-500 hover:text-slate-700 hover:bg-slate-100 h-8 w-8"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteTemplate(temp._id || temp.id)}
+                        className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
                   )}
                   <Link href="/dashboard/campaigns">
                     <Button variant="outline" size="sm">
@@ -472,8 +508,12 @@ export default function TemplatesPage() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit Simulation Template</DialogTitle>
-            <DialogDescription>Update the subject, body, and other details of this template.</DialogDescription>
+            <DialogTitle>{editMode === 'clone' ? 'Edit as New Template' : 'Edit Simulation Template'}</DialogTitle>
+            <DialogDescription>
+              {editMode === 'clone'
+                ? 'Global templates are shared and read-only - your changes are saved as a new custom template, leaving the original untouched.'
+                : 'Update the subject, body, and other details of this template.'}
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleUpdateTemplate} className="space-y-4 text-xs font-semibold">
@@ -580,7 +620,7 @@ export default function TemplatesPage() {
                 Cancel
               </Button>
               <Button type="submit" size="sm">
-                Save Changes
+                {editMode === 'clone' ? 'Save as New Template' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </form>
