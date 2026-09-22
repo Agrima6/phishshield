@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
+import { renderTemplateEmailHtml, templateHeaderImageUrl } from '@/lib/templateEmail';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -122,12 +123,7 @@ export default function CampaignsPage() {
 
     try {
       // 1. Create campaign in Flask backend
-      // Only an uploaded-image thumbnail is a real header image - the emoji/
-      // icon fallbacks templates get when no image was uploaded aren't URLs.
-      const headerImageUrl = chosenTemplate?.thumbnail &&
-        (chosenTemplate.thumbnail.startsWith('http') || chosenTemplate.thumbnail.startsWith('/'))
-        ? chosenTemplate.thumbnail
-        : undefined;
+      const headerImageUrl = templateHeaderImageUrl(chosenTemplate) || undefined;
 
       const created = await api.campaigns.create({
         name: newCampaign.name,
@@ -258,14 +254,7 @@ export default function CampaignsPage() {
     }
   };
 
-  const renderTemplatePreviewHtml = (temp: any) => {
-    if (!temp?.body) return '';
-    return temp.body
-      .replaceAll('{{greeting}}', 'Hi')
-      .replaceAll('{{first_name}}', 'Alex')
-      .replaceAll('{{email}}', 'alex.morgan@yourcompany.com')
-      .replaceAll('{{phishing_link}}', '#preview-only');
-  };
+  const renderTemplatePreviewHtml = renderTemplateEmailHtml;
 
   const filteredCampaigns = campaigns.filter(camp => {
     if (filterStatus === 'all') return true;

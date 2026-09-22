@@ -15,6 +15,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { api, API_BASE } from '@/lib/api';
+import { renderTemplateEmailHtml } from '@/lib/templateEmail';
 import { PhishingTemplate } from '@/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -285,37 +286,7 @@ export default function TemplatesPage() {
     setPreviewOpen(true);
   };
 
-  // Fills in the same placeholders the real send pipeline substitutes, with
-  // realistic sample values, so the preview shows what a recipient would
-  // actually see rather than raw {{tokens}}.
-  const renderPreviewHtml = (temp: any) => {
-    if (!temp?.body) return '';
-    let body = temp.body as string;
-    // Mirrors the backend's _inject_header_image, so the preview matches
-    // exactly what a launched campaign actually sends (see app.py):
-    // - body already has an <img>? swap that first image's src for the
-    //   uploaded header image, so re-uploading it actually changes what
-    //   shows, instead of leaving a stale hardcoded image in place.
-    // - no <img> at all? insert one as the first row.
-    const headerImageUrl = temp.thumbnail &&
-      (temp.thumbnail.startsWith('http') || temp.thumbnail.startsWith('/')) ? temp.thumbnail : '';
-    if (headerImageUrl) {
-      if (/<img\b/i.test(body)) {
-        body = body.replace(/(<img\b[^>]*\bsrc=")([^"]+)(")/i, `$1${headerImageUrl}$3`);
-      } else {
-        const headerImg = `<img src="${headerImageUrl}" width="600" alt="" style="display:block;width:100%;height:auto;border:0;" />`;
-        const tableOpen = body.match(/<table\b[^>]*>/i);
-        body = tableOpen
-          ? body.slice(0, tableOpen.index! + tableOpen[0].length) + `<tr><td>${headerImg}</td></tr>` + body.slice(tableOpen.index! + tableOpen[0].length)
-          : headerImg + body;
-      }
-    }
-    return body
-      .replaceAll('{{greeting}}', 'Hi')
-      .replaceAll('{{first_name}}', 'Alex')
-      .replaceAll('{{email}}', 'alex.morgan@yourcompany.com')
-      .replaceAll('{{phishing_link}}', '#preview-only');
-  };
+  const renderPreviewHtml = renderTemplateEmailHtml;
 
   const filteredTemplates = templates.filter((t) => {
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
