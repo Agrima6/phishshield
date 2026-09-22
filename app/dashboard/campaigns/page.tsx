@@ -122,13 +122,21 @@ export default function CampaignsPage() {
 
     try {
       // 1. Create campaign in Flask backend
+      // Only an uploaded-image thumbnail is a real header image - the emoji/
+      // icon fallbacks templates get when no image was uploaded aren't URLs.
+      const headerImageUrl = chosenTemplate?.thumbnail &&
+        (chosenTemplate.thumbnail.startsWith('http') || chosenTemplate.thumbnail.startsWith('/'))
+        ? chosenTemplate.thumbnail
+        : undefined;
+
       const created = await api.campaigns.create({
         name: newCampaign.name,
         subject: newCampaign.subject,
         body_html: bodyHtml,
         sender_name: newCampaign.senderName,
         redirect_url: newCampaign.redirectUrl || defaultRedirectForTemplate(chosenTemplate?.name || ''),
-        email_config_id: newCampaign.emailConfigId || undefined
+        email_config_id: newCampaign.emailConfigId || undefined,
+        header_image_url: headerImageUrl,
       });
 
       // 2. Target the selected employees

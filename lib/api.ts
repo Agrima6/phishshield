@@ -317,6 +317,10 @@ export const api = {
       sender_name: string;
       redirect_url?: string;
       email_config_id?: string;
+      // The selected template's header image - the backend inserts it into
+      // body_html server-side (once, only if the body doesn't already have
+      // an <img>), so every send path includes it regardless of provider.
+      header_image_url?: string;
     }) => {
       const res = await fetcher<any>('/api/phish/campaigns', {
         method: 'POST',
