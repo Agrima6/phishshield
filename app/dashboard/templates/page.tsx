@@ -291,17 +291,24 @@ export default function TemplatesPage() {
   const renderPreviewHtml = (temp: any) => {
     if (!temp?.body) return '';
     let body = temp.body as string;
-    // Mirrors the backend's _inject_header_image: only add the header image
-    // if the body doesn't already embed one, so the preview matches exactly
-    // what a launched campaign actually sends (see app.py).
+    // Mirrors the backend's _inject_header_image, so the preview matches
+    // exactly what a launched campaign actually sends (see app.py):
+    // - body already has an <img>? swap that first image's src for the
+    //   uploaded header image, so re-uploading it actually changes what
+    //   shows, instead of leaving a stale hardcoded image in place.
+    // - no <img> at all? insert one as the first row.
     const headerImageUrl = temp.thumbnail &&
       (temp.thumbnail.startsWith('http') || temp.thumbnail.startsWith('/')) ? temp.thumbnail : '';
-    if (headerImageUrl && !/<img\b/i.test(body)) {
-      const headerImg = `<img src="${headerImageUrl}" width="600" alt="" style="display:block;width:100%;height:auto;border:0;" />`;
-      const tableOpen = body.match(/<table\b[^>]*>/i);
-      body = tableOpen
-        ? body.slice(0, tableOpen.index! + tableOpen[0].length) + `<tr><td>${headerImg}</td></tr>` + body.slice(tableOpen.index! + tableOpen[0].length)
-        : headerImg + body;
+    if (headerImageUrl) {
+      if (/<img\b/i.test(body)) {
+        body = body.replace(/(<img\b[^>]*\bsrc=")([^"]+)(")/i, `$1${headerImageUrl}$3`);
+      } else {
+        const headerImg = `<img src="${headerImageUrl}" width="600" alt="" style="display:block;width:100%;height:auto;border:0;" />`;
+        const tableOpen = body.match(/<table\b[^>]*>/i);
+        body = tableOpen
+          ? body.slice(0, tableOpen.index! + tableOpen[0].length) + `<tr><td>${headerImg}</td></tr>` + body.slice(tableOpen.index! + tableOpen[0].length)
+          : headerImg + body;
+      }
     }
     return body
       .replaceAll('{{greeting}}', 'Hi')
