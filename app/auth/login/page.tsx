@@ -13,7 +13,7 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 const loginSchema = zod.object({
-  email: zod.string().min(1, 'Username or email is required'),
+  email: zod.string().min(1, 'Email is required'),
   password: zod.string().min(1, 'Password is required'),
 });
 
@@ -69,12 +69,13 @@ function LoginPageInner() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Email or username</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
           <div className="relative">
             <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <Input
               type="text"
-              placeholder="aarav@company.com"
+              placeholder="you@company.com"
+              autoComplete="email"
               className="pl-9"
               error={!!errors.email}
               {...register('email')}

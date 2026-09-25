@@ -21,6 +21,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
 import { renderTemplateEmailHtml, templateHeaderImageUrl } from '@/lib/templateEmail';
+import { recipientDisplayStatus, recipientEnvironment } from '@/lib/tracking';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -721,15 +722,19 @@ export default function CampaignsPage() {
 
       {/* Campaign Report Dialog */}
       <Dialog open={!!reportCampaign} onOpenChange={(open) => !open && setReportCampaign(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>{reportCampaign?.name}</DialogTitle>
             <DialogDescription>{reportCampaign?.subject}</DialogDescription>
           </DialogHeader>
           {reportCampaign && (() => {
             const sent = reportCampaign.sentCount || reportCampaign.sent_count || 0;
-            const opened = reportCampaign.openedCount || reportCampaign.opened_count || 0;
             const clicked = reportCampaign.clickedCount || reportCampaign.clicked_count || 0;
+            // A click always implies the email was opened (the backend
+            // enforces this), so the funnel can never legitimately show
+            // fewer opens than clicks - the max() only guards against
+            // stale cached counts from before that rule existed.
+            const opened = Math.max(reportCampaign.openedCount || reportCampaign.opened_count || 0, clicked);
             const funnel = [
               { stage: 'Sent', value: sent, fill: '#7a1220' },
               { stage: 'Opened', value: opened, fill: '#f59e0b' },
@@ -778,41 +783,74 @@ export default function CampaignsPage() {
                           <TableHead>Status</TableHead>
                           <TableHead>Opened</TableHead>
                           <TableHead>Clicked</TableHead>
+                          <TableHead>Device</TableHead>
+                          <TableHead>IP address</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {reportLoading ? (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center py-6 text-slate-400 text-xs">
+                            <TableCell colSpan={6} className="text-center py-6 text-slate-400 text-xs">
                               Loading recipients...
                             </TableCell>
                           </TableRow>
                         ) : reportRecipients.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center py-6 text-slate-400 text-xs">
+                            <TableCell colSpan={6} className="text-center py-6 text-slate-400 text-xs">
                               No recipients on this campaign.
                             </TableCell>
                           </TableRow>
                         ) : (
-                          reportRecipients.map((r: any, idx: number) => (
+                          reportRecipients.map((r: any, idx: number) => {
+                            const status = recipientDisplayStatus(r);
+                            const env = recipientEnvironment(r);
+                            const openCount = r.open_count || 0;
+                            const clickCount = r.click_count || 0;
+                            return (
                             <TableRow key={r._id || r.id || idx}>
                               <TableCell>
                                 <div className="font-semibold text-slate-800">{r.name || r.email}</div>
                                 <div className="text-[10px] text-slate-400">{r.email}</div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant={r.status === 'clicked' ? 'danger' : r.status === 'opened' ? 'warning' : 'secondary'}>
-                                  {r.status}
+                                <Badge variant={status === 'clicked' || status === 'failed' ? 'danger' : status === 'opened' ? 'warning' : 'secondary'}>
+                                  {status}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-xs text-slate-500">
                                 {r.opened_at ? new Date(r.opened_at).toLocaleString() : '-'}
+                                {r.opened_at && (
+                                  <div className="text-[10px] text-slate-400">
+                                    {openCount > 0 ? `${openCount}× tracked` : 'inferred from click'}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="text-xs text-slate-500">
                                 {r.clicked_at ? new Date(r.clicked_at).toLocaleString() : '-'}
+                                {clickCount > 0 && (
+                                  <div className="text-[10px] text-slate-400">{clickCount}× clicked</div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs text-slate-500">
+                                {env.device || env.os || env.browser
+                                  ? [env.device, env.os, env.browser].filter(Boolean).join(' · ')
+                                  : '-'}
+                              </TableCell>
+                              <TableCell className="text-[11px] text-slate-500 font-mono">
+                                {env.clickIp && <div>Click: {env.clickIp}</div>}
+                                {env.openIp && (
+                                  <div>
+                                    Open: {env.openIp}
+                                    {env.openViaProxy && (
+                                      <span className="font-sans text-[10px] text-slate-400"> (Gmail proxy)</span>
+                                    )}
+                                  </div>
+                                )}
+                                {!env.clickIp && !env.openIp && '-'}
                               </TableCell>
                             </TableRow>
-                          ))
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>
