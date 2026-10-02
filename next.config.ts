@@ -15,7 +15,15 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const backend = process.env.BACKEND_URL;
     if (!backend) return [];
-    return [{ source: "/api/:path*", destination: `${backend}/api/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${backend}/api/:path*` },
+      // Uploaded logos/images are stored as "/static/uploads/<file>" for every
+      // company onboarded so far. That relative path resolves against THIS
+      // site, which doesn't serve it, so they rendered as broken images.
+      // Proxying it makes the stored paths work same-origin without
+      // rewriting any existing data.
+      { source: "/static/uploads/:path*", destination: `${backend}/static/uploads/:path*` },
+    ];
   },
 };
 
