@@ -55,5 +55,53 @@ export function recipientEnvironment(r: any) {
     clickIp: r?.clicked_ip || '',
     openIp: r?.opened_ip || '',
     openViaProxy: isProxyOpen(r?.opened_ua),
+    location: recipientLocation(r),
   };
+}
+
+export interface GeoDetails {
+  city: string;
+  region: string;
+  country: string;
+  countryCode: string;
+  lat: number | null;
+  lon: number | null;
+  isp: string;
+  hostname: string;
+}
+
+/** The backend stores geo as a JSON string (see geoip.py); a Gmail-proxy
+ * marker means the IP was Google's image proxy, so there is no real
+ * location for that event. */
+function parseGeo(raw?: string | null): GeoDetails | 'proxy' | null {
+  if (!raw) return null;
+  try {
+    const g = JSON.parse(raw);
+    if (g?.proxy) return 'proxy';
+    if (!g || typeof g !== 'object') return null;
+    return {
+      city: g.city || '',
+      region: g.region || '',
+      country: g.country || '',
+      countryCode: g.country_code || '',
+      lat: typeof g.lat === 'number' ? g.lat : null,
+      lon: typeof g.lon === 'number' ? g.lon : null,
+      isp: g.isp || '',
+      hostname: g.hostname || '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Approximate location of the recipient. Prefers the click (their own
+ * browser) over the open (often Gmail's proxy, whose location is Google's
+ * data centre, not theirs). `proxyOnly` is true when the only network
+ * evidence is a proxied open, so the UI can say why nothing is shown. */
+export function recipientLocation(r: any): { geo: GeoDetails | null; proxyOnly: boolean } {
+  const fromClick = parseGeo(r?.clicked_geo);
+  if (fromClick && fromClick !== 'proxy') return { geo: fromClick, proxyOnly: false };
+  const fromOpen = parseGeo(r?.opened_geo);
+  if (fromOpen && fromOpen !== 'proxy') return { geo: fromOpen, proxyOnly: false };
+  return { geo: null, proxyOnly: fromOpen === 'proxy' || fromClick === 'proxy' };
 }

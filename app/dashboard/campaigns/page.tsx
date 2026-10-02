@@ -785,18 +785,19 @@ export default function CampaignsPage() {
                           <TableHead>Clicked</TableHead>
                           <TableHead>Device</TableHead>
                           <TableHead>IP address</TableHead>
+                          <TableHead>Location (approx.)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {reportLoading ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-6 text-slate-400 text-xs">
+                            <TableCell colSpan={7} className="text-center py-6 text-slate-400 text-xs">
                               Loading recipients...
                             </TableCell>
                           </TableRow>
                         ) : reportRecipients.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-6 text-slate-400 text-xs">
+                            <TableCell colSpan={7} className="text-center py-6 text-slate-400 text-xs">
                               No recipients on this campaign.
                             </TableCell>
                           </TableRow>
@@ -848,6 +849,37 @@ export default function CampaignsPage() {
                                 )}
                                 {!env.clickIp && !env.openIp && '-'}
                               </TableCell>
+                              <TableCell className="text-xs text-slate-500">
+                                {env.location.geo ? (() => {
+                                  const g = env.location.geo;
+                                  const place = [g.city, g.region, g.countryCode || g.country].filter(Boolean).join(', ');
+                                  return (
+                                    <div className="space-y-0.5">
+                                      <div className="font-medium text-slate-700">{place || '-'}</div>
+                                      {g.lat !== null && g.lon !== null && (
+                                        <a
+                                          href={`https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lon}#map=10/${g.lat}/${g.lon}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="font-mono text-[11px] text-primary hover:underline"
+                                        >
+                                          {g.lat.toFixed(3)}, {g.lon.toFixed(3)}
+                                        </a>
+                                      )}
+                                      {g.isp && <div className="text-[10px] text-slate-400">{g.isp}</div>}
+                                      {g.hostname && (
+                                        <div className="text-[10px] text-slate-400 font-mono break-all" title={g.hostname}>
+                                          {g.hostname}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })() : env.location.proxyOnly ? (
+                                  <span className="text-[10px] text-slate-400">Only seen via Gmail's image proxy - no real location</span>
+                                ) : (
+                                  '-'
+                                )}
+                              </TableCell>
                             </TableRow>
                             );
                           })
@@ -855,6 +887,13 @@ export default function CampaignsPage() {
                       </TableBody>
                     </Table>
                   </div>
+                  <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+                    Location is estimated from the IP address: usually the nearest ISP hub, often tens of
+                    kilometres off, and unreliable for VPNs and mobile networks. The name shown under it is
+                    the IP&apos;s reverse-DNS name (typically the ISP&apos;s gateway), not the device&apos;s own
+                    name. A device&apos;s hostname and MAC address are never sent to a website, so they can&apos;t
+                    be reported.
+                  </p>
                 </div>
               </div>
             );
