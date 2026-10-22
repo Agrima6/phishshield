@@ -355,75 +355,96 @@ export default function CampaignsPage() {
           return { data, fmt };
         } catch { return null; }
       };
+      // Try the tenant logo first, then fall back to the bundled app logo so
+      // the report always carries a mark (both are served same-origin).
       const logoRaw: string = settings?.branding?.logoUrl || '';
-      const logo = logoRaw ? await loadImageDataUrl(logoRaw) : null;
+      let logo: { data: string; fmt: string } | null = null;
+      for (const cand of [logoRaw, '/workmate-shield-logo.png'].filter(Boolean)) {
+        logo = await loadImageDataUrl(cand);
+        if (logo) break;
+      }
 
       // Header band (brand colour + company logo)
+      const headerH = 118;
       doc.setFillColor(...brandCol);
-      doc.rect(0, 0, pageW, 112, 'F');
+      doc.rect(0, 0, pageW, headerH, 'F');
+      // subtle darker base stripe for depth
+      doc.setFillColor(0, 0, 0);
+      doc.setGState(new (doc as any).GState({ opacity: 0.12 }));
+      doc.rect(0, headerH - 6, pageW, 6, 'F');
+      doc.setGState(new (doc as any).GState({ opacity: 1 }));
       let titleX = M;
       if (logo) {
         doc.setFillColor(255, 255, 255);
-        doc.roundedRect(M, 32, 52, 52, 8, 8, 'F');
-        try { doc.addImage(logo.data, logo.fmt, M + 6, 38, 40, 40); } catch { /* unsupported image */ }
-        titleX = M + 66;
+        doc.roundedRect(M, 30, 56, 56, 10, 10, 'F');
+        try { doc.addImage(logo.data, logo.fmt, M + 7, 37, 42, 42); } catch { /* unsupported image */ }
+        titleX = M + 72;
       }
       doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
-      doc.text('Phishing Simulation Report', titleX, 48);
-      doc.setFontSize(12);
-      doc.text(reportCampaign.name || 'Campaign', titleX, 68);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-      doc.text(doc.splitTextToSize(reportCampaign.subject || '', pageW - titleX - M - 130), titleX, 86);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text(reportCampaign.name || 'Campaign', titleX, 46);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text('Phishing Simulation Report', titleX, 64);
+      doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(reportCampaign.subject || '', pageW - titleX - M - 130), titleX, 82);
       doc.setFontSize(8);
-      doc.text(`Generated ${new Date().toLocaleDateString()}`, pageW - M, 34, { align: 'right' });
-      const bw = 112, bh = 22, bx = pageW - M - bw, by = 48;
-      doc.setFillColor(...risk.col); doc.roundedRect(bx, by, bw, bh, 11, 11, 'F');
+      doc.text(`Generated ${new Date().toLocaleDateString()}`, pageW - M, 32, { align: 'right' });
+      const bw = 112, bh = 24, bx = pageW - M - bw, by = 46;
+      doc.setFillColor(...risk.col); doc.roundedRect(bx, by, bw, bh, 12, 12, 'F');
       doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-      doc.text(`Risk: ${risk.label}`, bx + bw / 2, by + 15, { align: 'center' });
+      doc.text(`Risk: ${risk.label}`, bx + bw / 2, by + 16, { align: 'center' });
 
-      // ---- Page 1: visual, low-text summary ----
+      // ---- Page 1: visual summary ----
       const recips: any[] = reportRecipients || [];
       const tg = 14;
 
-      // Big stat tiles
-      let y = 140;
+      // Donut gauge: the headline "click rate" metric
+      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+      doc.text('Click rate', M + 72, 150, { align: 'center' });
+      const gaugeCx = M + 72, gaugeCy = 208, gaugeR = 46;
+      const drawArc = (a0: number, a1: number, col: [number, number, number]) => {
+        doc.setDrawColor(...col);
+        const steps = Math.max(2, Math.round(Math.abs(a1 - a0) / 5));
+        let px: number | null = null, py = 0;
+        for (let i = 0; i <= steps; i++) {
+          const a = ((a0 + (a1 - a0) * i / steps) - 90) * Math.PI / 180;
+          const x = gaugeCx + gaugeR * Math.cos(a), yy = gaugeCy + gaugeR * Math.sin(a);
+          if (px !== null) doc.line(px, py, x, yy);
+          px = x; py = yy;
+        }
+      };
+      (doc as any).setLineCap('round');
+      doc.setLineWidth(13);
+      drawArc(0, 360, [236, 239, 244]);
+      if (clickRate > 0) drawArc(0, Math.min(360, clickRate * 3.6), red);
+      doc.setLineWidth(0.3);
+      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(24);
+      doc.text(`${clickRate}%`, gaugeCx, gaugeCy + 4, { align: 'center' });
+      doc.setTextColor(...sub); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      doc.text('clicked the link', gaugeCx, gaugeCy + 18, { align: 'center' });
+
+      // Stat tiles to the right of the gauge
+      const tileX0 = M + 160;
+      const tw = (pageW - M - tileX0 - tg * 2) / 3;
+      const tileY = 158, th = 92;
       const tiles: [string, string, [number, number, number], [number, number, number]][] = [
         ['Emails sent', String(sent), ink, [248, 250, 252]],
         ['Opened', String(opened), orange, [255, 247, 237]],
         ['Clicked', String(clicked), red, [254, 242, 242]],
       ];
-      const tw = (pageW - M * 2 - tg * 2) / 3;
-      const th = 84;
       tiles.forEach((t, i) => {
-        const x = M + i * (tw + tg);
+        const x = tileX0 + i * (tw + tg);
         doc.setFillColor(...t[3]); doc.setDrawColor(...line);
-        doc.roundedRect(x, y, tw, th, 10, 10, 'FD');
+        doc.roundedRect(x, tileY, tw, th, 10, 10, 'FD');
+        doc.setFillColor(...t[2]); doc.circle(x + 15, tileY + 18, 3.5, 'F');
         doc.setTextColor(...t[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(30);
-        doc.text(t[1], x + tw / 2, y + 50, { align: 'center' });
+        doc.text(t[1], x + tw / 2, tileY + 58, { align: 'center' });
         doc.setTextColor(...sub); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-        doc.text(t[0], x + tw / 2, y + 70, { align: 'center' });
+        doc.text(t[0], x + tw / 2, tileY + 78, { align: 'center' });
       });
-      y += th + 16;
 
-      // Rate chips
-      const chips: [string, string, [number, number, number], [number, number, number]][] = [
-        ['Open rate', `${openRate}%`, orange, [255, 247, 237]],
-        ['Click rate', `${clickRate}%`, red, [254, 242, 242]],
-        ['Click-through', `${ctr}%`, ink, [248, 250, 252]],
-      ];
-      const cw = (pageW - M * 2 - tg * 2) / 3;
-      const ch = 58;
-      chips.forEach((c, i) => {
-        const x = M + i * (cw + tg);
-        doc.setFillColor(...c[3]); doc.setDrawColor(...line);
-        doc.roundedRect(x, y, cw, ch, 10, 10, 'FD');
-        doc.setTextColor(...c[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(21);
-        doc.text(c[1], x + 16, y + 33);
-        doc.setTextColor(...sub); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-        doc.text(c[0], x + 16, y + 49);
-      });
-      y += ch + 26;
+      let y = Math.max(gaugeCy + gaugeR, tileY + th) + 34;
 
       // Engagement funnel
       doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
@@ -446,6 +467,39 @@ export default function CampaignsPage() {
         doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
         doc.text(`${val}  (${sent ? Math.round((val / sent) * 100) : 0}%)`, barX + barMax + 8, y + 13);
         y += 28;
+      });
+      y += 12;
+
+      // Exposure breakdown: one segmented bar + legend
+      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+      doc.text('Exposure breakdown', M, y);
+      y += 16;
+      const openedOnly = Math.max(0, opened - clicked);
+      const notOpened = Math.max(0, sent - opened);
+      const totalExp = Math.max(1, clicked + openedOnly + notOpened);
+      const segs: [string, number, [number, number, number]][] = [
+        ['Clicked', clicked, red],
+        ['Opened, not clicked', openedOnly, orange],
+        ['Not opened', notOpened, [148, 163, 184]],
+      ];
+      const expW = pageW - M * 2;
+      let sx = M;
+      segs.forEach(([, val, col]) => {
+        const w = (val / totalExp) * expW;
+        if (w <= 0) return;
+        doc.setFillColor(...col);
+        doc.rect(sx, y, w, 20, 'F');
+        sx += w;
+      });
+      y += 36;
+      const legW = (pageW - M * 2) / 3;
+      segs.forEach(([lab, val, col], i) => {
+        const x = M + i * legW;
+        doc.setFillColor(...col); doc.roundedRect(x, y - 9, 10, 10, 2, 2, 'F');
+        doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+        doc.text(String(val), x + 16, y);
+        doc.setTextColor(...sub); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+        doc.text(lab, x + 16, y + 12);
       });
 
       // Recipient detail on its own page
