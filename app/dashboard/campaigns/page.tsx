@@ -317,6 +317,7 @@ export default function CampaignsPage() {
       const maroon: [number, number, number] = [122, 18, 32];
       const orange: [number, number, number] = [217, 119, 6];
       const red: [number, number, number] = [220, 38, 38];
+      const green: [number, number, number] = [22, 163, 74];
       const ink: [number, number, number] = [15, 23, 42];
       const sub: [number, number, number] = [100, 116, 139];
       const line: [number, number, number] = [226, 232, 240];
@@ -342,9 +343,53 @@ export default function CampaignsPage() {
       doc.text(doc.splitTextToSize(reportCampaign.subject || '', pageW - M * 2 - 170), M, 80);
       doc.setFontSize(9);
       doc.text(`Generated ${new Date().toLocaleString()}`, pageW - M, 40, { align: 'right' });
-      doc.text('Workmate Shield', pageW - M, 56, { align: 'right' });
+      doc.text('Confidential', pageW - M, 56, { align: 'right' });
 
-      let y = 122;
+      // Aggregates for the analytical sections
+      const recips: any[] = reportRecipients || [];
+      const totalR = recips.length || sent;
+      const outcome = { clicked: 0, opened: 0, delivered: 0, failed: 0, pending: 0 };
+      recips.forEach((r) => {
+        const s = recipientDisplayStatus(r);
+        if (s === 'clicked') outcome.clicked++;
+        else if (s === 'opened') outcome.opened++;
+        else if (s === 'failed') outcome.failed++;
+        else if (s === 'sent') outcome.delivered++;
+        else outcome.pending++;
+      });
+      const repeatClickers = recips.filter((r) => (r.click_count || 0) > 1).length;
+      const tally = (keyFn: (r: any) => string): [string, number][] => {
+        const m = new Map<string, number>();
+        recips.forEach((r) => { const k = keyFn(r) || 'Unknown'; m.set(k, (m.get(k) || 0) + 1); });
+        return [...m.entries()].sort((a, b) => b[1] - a[1]);
+      };
+      const byDevice = tally((r) => { const e = recipientEnvironment(r); return [e.device, e.os].filter(Boolean).join(' · ') || 'Unknown'; });
+      const byBrowser = tally((r) => recipientEnvironment(r).browser || 'Unknown');
+      const byLocation = tally((r) => { const g = recipientEnvironment(r).location.geo; return g ? [g.city, g.region, g.countryCode || g.country].filter(Boolean).join(', ') : 'Unknown'; });
+      const clickTimes = recips.map((r) => (r.clicked_at ? new Date(r.clicked_at).getTime() : null)).filter((t): t is number => !!t);
+      const openTimes = recips.map((r) => (r.opened_at ? new Date(r.opened_at).getTime() : null)).filter((t): t is number => !!t);
+      const firstOpen = openTimes.length ? new Date(Math.min(...openTimes)) : null;
+      const firstClick = clickTimes.length ? new Date(Math.min(...clickTimes)) : null;
+      const lastClick = clickTimes.length ? new Date(Math.max(...clickTimes)) : null;
+      const risk = clickRate >= 50 ? { label: 'High', col: red } : clickRate >= 20 ? { label: 'Moderate', col: orange } : clickRate > 0 ? { label: 'Low–Moderate', col: orange } : { label: 'Low', col: green };
+
+      let y = 118;
+
+      // Executive summary with a risk badge
+      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text('Executive summary', M, y);
+      const badgeW = 104, badgeH = 20, badgeX = pageW - M - badgeW, badgeY = y - 14;
+      doc.setFillColor(...risk.col); doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 4, 4, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text(`Risk: ${risk.label}`, badgeX + badgeW / 2, badgeY + 13, { align: 'center' });
+      y += 10;
+      const summary = `Delivered to ${sent} recipient(s): ${opened} opened the email (${openRate}%) and ${clicked} clicked the simulated link (${clickRate}%). Of those who opened, ${ctr}% went on to click, and ${repeatClickers} recipient(s) clicked more than once.${firstClick ? ` First click recorded at ${firstClick.toLocaleString()}.` : ''}`;
+      const sLines = doc.splitTextToSize(summary, pageW - M * 2 - 16);
+      const boxH = sLines.length * 12 + 16;
+      doc.setFillColor(250, 250, 251); doc.setDrawColor(...line); doc.roundedRect(M, y, pageW - M * 2, boxH, 6, 6, 'FD');
+      doc.setTextColor(55, 65, 81); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      doc.text(sLines, M + 8, y + 16);
+      y += boxH + 22;
 
       // KPI cards
       const cards: [string, string, [number, number, number]][] = [
@@ -404,16 +449,70 @@ export default function CampaignsPage() {
         doc.text(`${val}  (${sent ? Math.round((val / sent) * 100) : 0}%)`, barX + barMax + 8, y + 11);
         y += 22;
       });
-      y += 12;
+      y += 18;
 
-      // Recipient table
-      const tableBody = reportRecipients.map((r: any) => {
+      // Breakdown tables (auto-paginate on their own)
+      const breakdown = (title: string, label: string, rows: [string, number][]) => {
+        if (y > pageH - 120) { doc.addPage(); y = 54; }
+        doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        doc.text(title, M, y);
+        autoTable(doc, {
+          startY: y + 8,
+          theme: 'grid',
+          head: [[label, 'Count', 'Share']],
+          body: (rows.length ? rows : ([['—', 0]] as [string, number][])).map(([k, c]) => [k, String(c), totalR ? `${Math.round((c / totalR) * 100)}%` : '0%']),
+          margin: { left: M, right: M, bottom: 44 },
+          styles: { font: 'helvetica', fontSize: 8, cellPadding: 4, textColor: [30, 41, 59], lineColor: line, lineWidth: 0.5 },
+          headStyles: { fillColor: [241, 245, 249], textColor: ink, fontStyle: 'bold', fontSize: 8 },
+          columnStyles: { 1: { cellWidth: 60, halign: 'center' }, 2: { cellWidth: 60, halign: 'center' } },
+        } as any);
+        y = (doc as any).lastAutoTable.finalY + 20;
+      };
+
+      breakdown('Outcome breakdown', 'Outcome', [
+        ['Clicked', outcome.clicked],
+        ['Opened (not clicked)', outcome.opened],
+        ['Delivered (not opened)', outcome.delivered],
+        ['Failed', outcome.failed],
+        ['Pending', outcome.pending],
+      ]);
+      breakdown('Device & OS', 'Device', byDevice);
+      breakdown('Browser', 'Browser', byBrowser);
+      breakdown('Location', 'Location', byLocation);
+
+      // Timing & key facts
+      if (y > pageH - 130) { doc.addPage(); y = 54; }
+      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text('Timing & key facts', M, y);
+      autoTable(doc, {
+        startY: y + 8,
+        theme: 'plain',
+        body: [
+          ['First open', firstOpen ? firstOpen.toLocaleString() : '—'],
+          ['First click', firstClick ? firstClick.toLocaleString() : '—'],
+          ['Last click', lastClick ? lastClick.toLocaleString() : '—'],
+          ['Repeat clickers', String(repeatClickers)],
+          ['Unique recipients', String(totalR)],
+        ],
+        margin: { left: M, right: M, bottom: 44 },
+        styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
+        columnStyles: { 0: { cellWidth: 150, fontStyle: 'bold', textColor: sub } },
+      } as any);
+
+      // Recipient detail on its own page
+      doc.addPage();
+      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+      doc.text('Recipient detail', M, 48);
+
+      const tableBody = recips.map((r: any) => {
         const env = recipientEnvironment(r);
         const g = env.location.geo;
         const place = g
           ? [g.city, g.region, g.countryCode || g.country].filter(Boolean).join(', ')
           : env.location.proxyOnly ? 'Proxy only' : '-';
-        const who = r.name && r.email ? `${r.name}\n${r.email}` : (r.name || r.email || '-');
+        // Only show the email on a second line when the name is a distinct
+        // value - avoids the "email printed twice" when name === email.
+        const who = r.name && r.name !== r.email ? `${r.name}\n${r.email}` : (r.email || r.name || '-');
         return [
           who,
           recipientDisplayStatus(r),
@@ -426,7 +525,7 @@ export default function CampaignsPage() {
       });
 
       autoTable(doc, {
-        startY: y,
+        startY: 60,
         head: [['Recipient', 'Status', 'Opened', 'Clicked', 'Device', 'IP', 'Location']],
         body: tableBody.length ? tableBody : [['No recipients on this campaign.', '', '', '', '', '', '']],
         margin: { left: M, right: M, bottom: 44 },
@@ -443,16 +542,23 @@ export default function CampaignsPage() {
             else data.cell.styles.textColor = sub;
           }
         },
-        didDrawPage: () => {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(7);
-          doc.setTextColor(...sub);
-          const note = 'Location is estimated from the IP address and is approximate; the sub-label is the IP reverse-DNS (ISP gateway), not the device. Hostnames and MAC addresses are never sent to a website.';
-          doc.text(doc.splitTextToSize(note, pageW - M * 2), M, pageH - 30);
-          doc.text(reportCampaign.name || 'Campaign', M, pageH - 14);
-          doc.text(`Page ${(doc.internal as any).getCurrentPageInfo().pageNumber}`, pageW - M, pageH - 14, { align: 'right' });
-        },
-      });
+      } as any);
+
+      // Location disclaimer after the detail table
+      let dy = (doc as any).lastAutoTable.finalY + 14;
+      if (dy > pageH - 60) { doc.addPage(); dy = 54; }
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(...sub);
+      const note = 'Location is estimated from the IP address and is approximate (often the ISP hub, unreliable for VPNs and mobile networks). The sub-label is the IP reverse-DNS (ISP gateway), not the device. Hostnames and MAC addresses are never sent to a website.';
+      doc.text(doc.splitTextToSize(note, pageW - M * 2), M, dy);
+
+      // Consistent footer on every page
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...sub);
+        doc.text(reportCampaign.name || 'Campaign', M, pageH - 16);
+        doc.text(`Page ${i} of ${pageCount}`, pageW - M, pageH - 16, { align: 'right' });
+      }
 
       const safeName = (reportCampaign.name || 'campaign').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
       doc.save(`${safeName}-report-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -1222,7 +1328,9 @@ export default function CampaignsPage() {
                             <TableRow key={r._id || r.id || idx}>
                               <TableCell>
                                 <div className="font-semibold text-slate-900">{r.name || r.email}</div>
-                                <div className="text-[11px] text-slate-500">{r.email}</div>
+                                {r.name && r.name !== r.email && (
+                                  <div className="text-[11px] text-slate-500">{r.email}</div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Badge variant={status === 'clicked' || status === 'failed' ? 'danger' : status === 'opened' ? 'warning' : 'secondary'}>
