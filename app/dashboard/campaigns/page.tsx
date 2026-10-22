@@ -328,176 +328,125 @@ export default function CampaignsPage() {
       const openRate = sent ? Math.round((opened / sent) * 100) : 0;
       const clickRate = sent ? Math.round((clicked / sent) * 100) : 0;
       const ctr = opened ? Math.round((clicked / opened) * 100) : 0;
-
-      // Header band
-      doc.setFillColor(...maroon);
-      doc.rect(0, 0, pageW, 96, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.text('Phishing Simulation Report', M, 40);
-      doc.setFontSize(13);
-      doc.text(reportCampaign.name || 'Campaign', M, 62);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text(doc.splitTextToSize(reportCampaign.subject || '', pageW - M * 2 - 170), M, 80);
-      doc.setFontSize(9);
-      doc.text(`Generated ${new Date().toLocaleString()}`, pageW - M, 40, { align: 'right' });
-      doc.text('Confidential', pageW - M, 56, { align: 'right' });
-
-      // Aggregates for the analytical sections
-      const recips: any[] = reportRecipients || [];
-      const totalR = recips.length || sent;
-      const outcome = { clicked: 0, opened: 0, delivered: 0, failed: 0, pending: 0 };
-      recips.forEach((r) => {
-        const s = recipientDisplayStatus(r);
-        if (s === 'clicked') outcome.clicked++;
-        else if (s === 'opened') outcome.opened++;
-        else if (s === 'failed') outcome.failed++;
-        else if (s === 'sent') outcome.delivered++;
-        else outcome.pending++;
-      });
-      const repeatClickers = recips.filter((r) => (r.click_count || 0) > 1).length;
-      const tally = (keyFn: (r: any) => string): [string, number][] => {
-        const m = new Map<string, number>();
-        recips.forEach((r) => { const k = keyFn(r) || 'Unknown'; m.set(k, (m.get(k) || 0) + 1); });
-        return [...m.entries()].sort((a, b) => b[1] - a[1]);
-      };
-      const byDevice = tally((r) => { const e = recipientEnvironment(r); return [e.device, e.os].filter(Boolean).join(' · ') || 'Unknown'; });
-      const byBrowser = tally((r) => recipientEnvironment(r).browser || 'Unknown');
-      const byLocation = tally((r) => { const g = recipientEnvironment(r).location.geo; return g ? [g.city, g.region, g.countryCode || g.country].filter(Boolean).join(', ') : 'Unknown'; });
-      const clickTimes = recips.map((r) => (r.clicked_at ? new Date(r.clicked_at).getTime() : null)).filter((t): t is number => !!t);
-      const openTimes = recips.map((r) => (r.opened_at ? new Date(r.opened_at).getTime() : null)).filter((t): t is number => !!t);
-      const firstOpen = openTimes.length ? new Date(Math.min(...openTimes)) : null;
-      const firstClick = clickTimes.length ? new Date(Math.min(...clickTimes)) : null;
-      const lastClick = clickTimes.length ? new Date(Math.max(...clickTimes)) : null;
       const risk = clickRate >= 50 ? { label: 'High', col: red } : clickRate >= 20 ? { label: 'Moderate', col: orange } : clickRate > 0 ? { label: 'Low–Moderate', col: orange } : { label: 'Low', col: green };
 
-      let y = 118;
+      // Company branding: primary colour + logo, from tenant settings.
+      const hexToRgb = (hex?: string): [number, number, number] | null => {
+        if (!hex) return null;
+        const m = hex.replace('#', '').trim();
+        if (/^[0-9a-f]{6}$/i.test(m)) return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
+        if (/^[0-9a-f]{3}$/i.test(m)) return [parseInt(m[0] + m[0], 16), parseInt(m[1] + m[1], 16), parseInt(m[2] + m[2], 16)];
+        return null;
+      };
+      const brandCol: [number, number, number] = hexToRgb(settings?.branding?.primaryColor) || maroon;
+      const loadImageDataUrl = async (url: string): Promise<{ data: string; fmt: string } | null> => {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) return null;
+          const blob = await res.blob();
+          if (!/image\/(png|jpe?g|webp)/i.test(blob.type)) return null;
+          const fmt = /png/i.test(blob.type) ? 'PNG' : /webp/i.test(blob.type) ? 'WEBP' : 'JPEG';
+          const data: string = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result as string);
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+          });
+          return { data, fmt };
+        } catch { return null; }
+      };
+      const logoRaw: string = settings?.branding?.logoUrl || '';
+      const logo = logoRaw ? await loadImageDataUrl(logoRaw) : null;
 
-      // Executive summary with a risk badge
-      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text('Executive summary', M, y);
-      const badgeW = 104, badgeH = 20, badgeX = pageW - M - badgeW, badgeY = y - 14;
-      doc.setFillColor(...risk.col); doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 4, 4, 'F');
-      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-      doc.text(`Risk: ${risk.label}`, badgeX + badgeW / 2, badgeY + 13, { align: 'center' });
-      y += 10;
-      const summary = `Delivered to ${sent} recipient(s): ${opened} opened the email (${openRate}%) and ${clicked} clicked the simulated link (${clickRate}%). Of those who opened, ${ctr}% went on to click, and ${repeatClickers} recipient(s) clicked more than once.${firstClick ? ` First click recorded at ${firstClick.toLocaleString()}.` : ''}`;
-      const sLines = doc.splitTextToSize(summary, pageW - M * 2 - 16);
-      const boxH = sLines.length * 12 + 16;
-      doc.setFillColor(250, 250, 251); doc.setDrawColor(...line); doc.roundedRect(M, y, pageW - M * 2, boxH, 6, 6, 'FD');
-      doc.setTextColor(55, 65, 81); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-      doc.text(sLines, M + 8, y + 16);
-      y += boxH + 22;
-
-      // KPI cards
-      const cards: [string, string, [number, number, number]][] = [
-        ['Sent', String(sent), ink],
-        ['Opened', String(opened), orange],
-        ['Clicked', String(clicked), red],
-        ['Open rate', `${openRate}%`, orange],
-        ['Click rate', `${clickRate}%`, red],
-        ['Clicked / opened', `${ctr}%`, ink],
-      ];
-      const gap = 10;
-      const cardW = (pageW - M * 2 - gap * 5) / 6;
-      const cardH = 58;
-      cards.forEach((c, i) => {
-        const x = M + i * (cardW + gap);
-        doc.setFillColor(248, 250, 252);
-        doc.setDrawColor(...line);
-        doc.roundedRect(x, y, cardW, cardH, 6, 6, 'FD');
-        doc.setTextColor(...c[2]);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
-        doc.text(c[1], x + cardW / 2, y + 26, { align: 'center' });
-        doc.setTextColor(...sub);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.text(c[0], x + cardW / 2, y + 44, { align: 'center' });
-      });
-      y += cardH + 30;
-
-      // Engagement funnel infographic
-      doc.setTextColor(...ink);
-      doc.setFont('helvetica', 'bold');
+      // Header band (brand colour + company logo)
+      doc.setFillColor(...brandCol);
+      doc.rect(0, 0, pageW, 112, 'F');
+      let titleX = M;
+      if (logo) {
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(M, 32, 52, 52, 8, 8, 'F');
+        try { doc.addImage(logo.data, logo.fmt, M + 6, 38, 40, 40); } catch { /* unsupported image */ }
+        titleX = M + 66;
+      }
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
+      doc.text('Phishing Simulation Report', titleX, 48);
       doc.setFontSize(12);
+      doc.text(reportCampaign.name || 'Campaign', titleX, 68);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(reportCampaign.subject || '', pageW - titleX - M - 130), titleX, 86);
+      doc.setFontSize(8);
+      doc.text(`Generated ${new Date().toLocaleDateString()}`, pageW - M, 34, { align: 'right' });
+      const bw = 112, bh = 22, bx = pageW - M - bw, by = 48;
+      doc.setFillColor(...risk.col); doc.roundedRect(bx, by, bw, bh, 11, 11, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text(`Risk: ${risk.label}`, bx + bw / 2, by + 15, { align: 'center' });
+
+      // ---- Page 1: visual, low-text summary ----
+      const recips: any[] = reportRecipients || [];
+      const tg = 14;
+
+      // Big stat tiles
+      let y = 140;
+      const tiles: [string, string, [number, number, number], [number, number, number]][] = [
+        ['Emails sent', String(sent), ink, [248, 250, 252]],
+        ['Opened', String(opened), orange, [255, 247, 237]],
+        ['Clicked', String(clicked), red, [254, 242, 242]],
+      ];
+      const tw = (pageW - M * 2 - tg * 2) / 3;
+      const th = 84;
+      tiles.forEach((t, i) => {
+        const x = M + i * (tw + tg);
+        doc.setFillColor(...t[3]); doc.setDrawColor(...line);
+        doc.roundedRect(x, y, tw, th, 10, 10, 'FD');
+        doc.setTextColor(...t[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(30);
+        doc.text(t[1], x + tw / 2, y + 50, { align: 'center' });
+        doc.setTextColor(...sub); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        doc.text(t[0], x + tw / 2, y + 70, { align: 'center' });
+      });
+      y += th + 16;
+
+      // Rate chips
+      const chips: [string, string, [number, number, number], [number, number, number]][] = [
+        ['Open rate', `${openRate}%`, orange, [255, 247, 237]],
+        ['Click rate', `${clickRate}%`, red, [254, 242, 242]],
+        ['Click-through', `${ctr}%`, ink, [248, 250, 252]],
+      ];
+      const cw = (pageW - M * 2 - tg * 2) / 3;
+      const ch = 58;
+      chips.forEach((c, i) => {
+        const x = M + i * (cw + tg);
+        doc.setFillColor(...c[3]); doc.setDrawColor(...line);
+        doc.roundedRect(x, y, cw, ch, 10, 10, 'FD');
+        doc.setTextColor(...c[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(21);
+        doc.text(c[1], x + 16, y + 33);
+        doc.setTextColor(...sub); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        doc.text(c[0], x + 16, y + 49);
+      });
+      y += ch + 26;
+
+      // Engagement funnel
+      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
       doc.text('Engagement funnel', M, y);
-      y += 16;
-      const barX = M + 56;
-      const barMax = pageW - M - 90 - barX;
+      y += 20;
+      const barX = M + 64;
+      const barMax = pageW - M - 96 - barX;
       const maxVal = Math.max(sent, 1);
       const funnelRows: [string, number, [number, number, number]][] = [
-        ['Sent', sent, maroon],
+        ['Sent', sent, brandCol],
         ['Opened', opened, orange],
         ['Clicked', clicked, red],
       ];
       funnelRows.forEach(([label, val, col]) => {
-        doc.setTextColor(...ink);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.text(label, M, y + 11);
-        doc.setFillColor(241, 245, 249);
-        doc.roundedRect(barX, y, barMax, 14, 3, 3, 'F');
-        const w = Math.max(2, (val / maxVal) * barMax);
-        doc.setFillColor(...col);
-        doc.roundedRect(barX, y, w, 14, 3, 3, 'F');
-        doc.setTextColor(...ink);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text(`${val}  (${sent ? Math.round((val / sent) * 100) : 0}%)`, barX + barMax + 8, y + 11);
-        y += 22;
+        doc.setTextColor(...ink); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        doc.text(label, M, y + 13);
+        doc.setFillColor(241, 245, 249); doc.roundedRect(barX, y, barMax, 18, 4, 4, 'F');
+        const w = Math.max(3, (val / maxVal) * barMax);
+        doc.setFillColor(...col); doc.roundedRect(barX, y, w, 18, 4, 4, 'F');
+        doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+        doc.text(`${val}  (${sent ? Math.round((val / sent) * 100) : 0}%)`, barX + barMax + 8, y + 13);
+        y += 28;
       });
-      y += 18;
-
-      // Breakdown tables (auto-paginate on their own)
-      const breakdown = (title: string, label: string, rows: [string, number][]) => {
-        if (y > pageH - 120) { doc.addPage(); y = 54; }
-        doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-        doc.text(title, M, y);
-        autoTable(doc, {
-          startY: y + 8,
-          theme: 'grid',
-          head: [[label, 'Count', 'Share']],
-          body: (rows.length ? rows : ([['—', 0]] as [string, number][])).map(([k, c]) => [k, String(c), totalR ? `${Math.round((c / totalR) * 100)}%` : '0%']),
-          margin: { left: M, right: M, bottom: 44 },
-          styles: { font: 'helvetica', fontSize: 8, cellPadding: 4, textColor: [30, 41, 59], lineColor: line, lineWidth: 0.5 },
-          headStyles: { fillColor: [241, 245, 249], textColor: ink, fontStyle: 'bold', fontSize: 8 },
-          columnStyles: { 1: { cellWidth: 60, halign: 'center' }, 2: { cellWidth: 60, halign: 'center' } },
-        } as any);
-        y = (doc as any).lastAutoTable.finalY + 20;
-      };
-
-      breakdown('Outcome breakdown', 'Outcome', [
-        ['Clicked', outcome.clicked],
-        ['Opened (not clicked)', outcome.opened],
-        ['Delivered (not opened)', outcome.delivered],
-        ['Failed', outcome.failed],
-        ['Pending', outcome.pending],
-      ]);
-      breakdown('Device & OS', 'Device', byDevice);
-      breakdown('Browser', 'Browser', byBrowser);
-      breakdown('Location', 'Location', byLocation);
-
-      // Timing & key facts
-      if (y > pageH - 130) { doc.addPage(); y = 54; }
-      doc.setTextColor(...ink); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text('Timing & key facts', M, y);
-      autoTable(doc, {
-        startY: y + 8,
-        theme: 'plain',
-        body: [
-          ['First open', firstOpen ? firstOpen.toLocaleString() : '—'],
-          ['First click', firstClick ? firstClick.toLocaleString() : '—'],
-          ['Last click', lastClick ? lastClick.toLocaleString() : '—'],
-          ['Repeat clickers', String(repeatClickers)],
-          ['Unique recipients', String(totalR)],
-        ],
-        margin: { left: M, right: M, bottom: 44 },
-        styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
-        columnStyles: { 0: { cellWidth: 150, fontStyle: 'bold', textColor: sub } },
-      } as any);
 
       // Recipient detail on its own page
       doc.addPage();
@@ -530,7 +479,7 @@ export default function CampaignsPage() {
         body: tableBody.length ? tableBody : [['No recipients on this campaign.', '', '', '', '', '', '']],
         margin: { left: M, right: M, bottom: 44 },
         styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 4, textColor: [30, 41, 59], lineColor: line, lineWidth: 0.5, valign: 'middle' },
-        headStyles: { fillColor: maroon, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        headStyles: { fillColor: brandCol, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
         alternateRowStyles: { fillColor: [250, 250, 251] },
         columnStyles: { 0: { cellWidth: 108 }, 1: { cellWidth: 46, halign: 'center' } },
         didParseCell: (data: any) => {
