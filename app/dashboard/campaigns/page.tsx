@@ -16,7 +16,9 @@ import {
   Eye,
   Clock,
   XCircle,
-  BarChart3
+  BarChart3,
+  Pencil,
+  Download
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
@@ -35,14 +37,35 @@ import { toast } from 'sonner';
 // where the "Sign in" button ultimately sends them. Match the template's
 // implied brand where it's a real, well-known one; otherwise fall back to a
 // neutral page instead of always pointing at Microsoft regardless of theme.
-function defaultRedirectForTemplate(templateName: string): string {
-  const name = templateName.toLowerCase();
-  if (name.includes('microsoft') || name.includes('password') || name.includes('vpn') || name.includes('login')) {
-    return 'https://login.microsoftonline.com';
+//
+// This looks at BOTH the template name and its free-text theme/subject so a
+// "Invoice Payment Overdue" or "Google Drive share" template no longer gets
+// funnelled to the Microsoft login page just because it mentions a password.
+// The admin can always override whatever this returns in the final step.
+function defaultRedirectForTemplate(template: { name?: string; theme?: string; subject?: string; category?: string } | string): string {
+  const hay = (typeof template === 'string'
+    ? template
+    : [template?.name, template?.theme, template?.subject, template?.category].filter(Boolean).join(' ')
+  ).toLowerCase();
+
+  const brandRedirects: [RegExp, string][] = [
+    [/onedrive|share ?point|sharepoint/, 'https://onedrive.live.com'],
+    [/google ?drive|gmail|google ?workspace|google/, 'https://accounts.google.com'],
+    [/dropbox/, 'https://www.dropbox.com/login'],
+    [/zoom/, 'https://zoom.us/signin'],
+    [/slack/, 'https://slack.com/signin'],
+    [/docusign/, 'https://account.docusign.com'],
+    [/workday|benefits|payroll|hr\b|open enrollment/, 'https://www.workday.com/en-us/login.html'],
+    [/invoice|payment|accounts ?payable|finance|billing|quickbooks/, 'https://quickbooks.intuit.com/login/'],
+    [/linkedin/, 'https://www.linkedin.com/login'],
+    [/amazon|aws/, 'https://www.amazon.com/ap/signin'],
+    [/okta/, 'https://login.okta.com'],
+    [/office ?365|outlook|microsoft|o365|azure|teams|password|vpn|mfa|login|account/, 'https://login.microsoftonline.com'],
+  ];
+  for (const [pattern, url] of brandRedirects) {
+    if (pattern.test(hay)) return url;
   }
-  if (name.includes('onedrive')) return 'https://onedrive.live.com';
-  if (name.includes('zoom')) return 'https://zoom.us';
-  if (name.includes('workday') || name.includes('benefits')) return 'https://www.workday.com';
+  // Nothing matched a known brand - a neutral, obviously-safe landing spot.
   return 'https://www.google.com';
 }
 
@@ -68,8 +91,17 @@ export default function CampaignsPage() {
     senderName: '',
     templateId: '',
     emailConfigId: '',
-    redirectUrl: ''
+    redirectUrl: '',
+    // Per-campaign override of the chosen template's email HTML. Empty means
+    // "use the template body as-is"; editing it in the wizard customises this
+    // one send without touching the saved template.
+    bodyHtml: ''
   });
+
+  // Inline "edit this template for this campaign only" editor, opened from
+  // the template-selection step.
+  const [editTemplateOpen, setEditTemplateOpen] = useState(false);
+  const [templateDraft, setTemplateDraft] = useState({ subject: '', bodyHtml: '', redirectUrl: '' });
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
@@ -114,7 +146,11 @@ export default function CampaignsPage() {
     }
 
     const chosenTemplate = templates.find(t => (t._id || t.id) === newCampaign.templateId);
-    const bodyHtml = chosenTemplate ? chosenTemplate.body : '<p>Account verification required.</p>';
+    // Prefer the per-campaign edited body if the admin customised it in the
+    // wizard; otherwise fall back to the saved template body.
+    const bodyHtml = newCampaign.bodyHtml?.trim()
+      ? newCampaign.bodyHtml
+      : (chosenTemplate ? chosenTemplate.body : '<p>Account verification required.</p>');
 
     const targetEmployees = employees.filter((e) => selectedEmployeeIds.includes(e._id || e.id));
     if (targetEmployees.length === 0) {
@@ -131,7 +167,7 @@ export default function CampaignsPage() {
         subject: newCampaign.subject,
         body_html: bodyHtml,
         sender_name: newCampaign.senderName,
-        redirect_url: newCampaign.redirectUrl || defaultRedirectForTemplate(chosenTemplate?.name || ''),
+        redirect_url: newCampaign.redirectUrl || defaultRedirectForTemplate(chosenTemplate || ''),
         email_config_id: newCampaign.emailConfigId || undefined,
         header_image_url: headerImageUrl,
       });
@@ -150,7 +186,8 @@ export default function CampaignsPage() {
         senderName: '',
         templateId: '',
         emailConfigId: '',
-        redirectUrl: ''
+        redirectUrl: '',
+        bodyHtml: ''
       });
       loadData();
     } catch (err: any) {
@@ -204,6 +241,58 @@ export default function CampaignsPage() {
     } finally {
       setReportLoading(false);
     }
+  };
+
+  // Build a detailed CSV from the recipient data already loaded for the open
+  // report and trigger a client-side download. Done in the browser (rather
+  // than hitting the backend export endpoint) so the file always matches
+  // exactly what the admin is looking at, with no extra auth round-trip.
+  const downloadCampaignReportCsv = () => {
+    if (!reportCampaign) return;
+    const esc = (v: any) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const headers = [
+      'Name', 'Email', 'Status', 'Opened At', 'Open Count', 'Clicked At', 'Click Count',
+      'Device', 'OS', 'Browser', 'Click IP', 'Open IP', 'Open via proxy',
+      'City', 'Region', 'Country', 'Latitude', 'Longitude', 'ISP', 'Reverse DNS',
+    ];
+    const rows = reportRecipients.map((r: any) => {
+      const env = recipientEnvironment(r);
+      const g = env.location.geo;
+      return [
+        r.name || '', r.email || '', recipientDisplayStatus(r),
+        r.opened_at ? new Date(r.opened_at).toISOString() : '', r.open_count || 0,
+        r.clicked_at ? new Date(r.clicked_at).toISOString() : '', r.click_count || 0,
+        env.device, env.os, env.browser, env.clickIp, env.openIp, env.openViaProxy ? 'yes' : 'no',
+        g?.city || '', g?.region || '', g?.country || '',
+        g?.lat ?? '', g?.lon ?? '', g?.isp || '', g?.hostname || '',
+      ].map(esc).join(',');
+    });
+    const sent = reportCampaign.sentCount || reportCampaign.sent_count || 0;
+    const clicked = reportCampaign.clickedCount || reportCampaign.clicked_count || 0;
+    const opened = Math.max(reportCampaign.openedCount || reportCampaign.opened_count || 0, clicked);
+    const summary = [
+      `# Campaign,${esc(reportCampaign.name)}`,
+      `# Subject,${esc(reportCampaign.subject)}`,
+      `# Exported,${new Date().toISOString()}`,
+      `# Sent,${sent}`,
+      `# Opened,${opened}`,
+      `# Clicked,${clicked}`,
+      '',
+    ].join('\n');
+    const csv = summary + headers.join(',') + '\n' + rows.join('\n') + '\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (reportCampaign.name || 'campaign').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    a.href = url;
+    a.download = `${safeName}-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleDeleteCampaignClick = (id: string) => {
@@ -560,7 +649,8 @@ export default function CampaignsPage() {
                       ...newCampaign,
                       templateId: tempId,
                       subject: temp.subject,
-                      redirectUrl: defaultRedirectForTemplate(temp.name || ''),
+                      bodyHtml: temp.body || '',
+                      redirectUrl: defaultRedirectForTemplate(temp),
                     })}
                     className={`p-3 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${
                       newCampaign.templateId === tempId 
@@ -571,7 +661,12 @@ export default function CampaignsPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-xl">{temp.thumbnail && (temp.thumbnail.startsWith('/') || temp.thumbnail.startsWith('http')) ? '🎨' : (temp.thumbnail || '🔑')}</span>
                       <div>
-                        <h4 className="font-semibold text-xs text-slate-900">{temp.name}</h4>
+                        <h4 className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
+                          {temp.name}
+                          {newCampaign.templateId === tempId && newCampaign.bodyHtml && newCampaign.bodyHtml !== (temp.body || '') && (
+                            <Badge variant="warning" className="text-[9px] scale-90">Customised</Badge>
+                          )}
+                        </h4>
                         <p className="text-[10px] text-slate-500">{temp.description}</p>
                       </div>
                     </div>
@@ -580,9 +675,38 @@ export default function CampaignsPage() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-slate-400 hover:text-primary"
+                        title="Preview email"
                         onClick={(e) => { e.stopPropagation(); setPreviewTemplate(temp); }}
                       >
                         <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-slate-400 hover:text-primary"
+                        title="Edit for this campaign"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Select this template and open the per-campaign editor,
+                          // seeding the draft from whatever is current (an earlier
+                          // edit on this template, else the saved template body).
+                          const alreadySelected = newCampaign.templateId === tempId;
+                          setNewCampaign((prev) => ({
+                            ...prev,
+                            templateId: tempId,
+                            subject: alreadySelected ? prev.subject : temp.subject,
+                            bodyHtml: alreadySelected && prev.bodyHtml ? prev.bodyHtml : (temp.body || ''),
+                            redirectUrl: alreadySelected && prev.redirectUrl ? prev.redirectUrl : defaultRedirectForTemplate(temp),
+                          }));
+                          setTemplateDraft({
+                            subject: alreadySelected && newCampaign.subject ? newCampaign.subject : temp.subject || '',
+                            bodyHtml: alreadySelected && newCampaign.bodyHtml ? newCampaign.bodyHtml : (temp.body || ''),
+                            redirectUrl: alreadySelected && newCampaign.redirectUrl ? newCampaign.redirectUrl : defaultRedirectForTemplate(temp),
+                          });
+                          setEditTemplateOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       {newCampaign.templateId === tempId && (
                         <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
@@ -691,6 +815,85 @@ export default function CampaignsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit-template-for-this-campaign Dialog */}
+      <Dialog open={editTemplateOpen} onOpenChange={setEditTemplateOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit template for this campaign</DialogTitle>
+            <DialogDescription>
+              Changes here apply to this one simulation only — the saved template is left untouched.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+            <div className="space-y-3 text-xs font-semibold">
+              <div>
+                <label className="block text-slate-700 mb-1">Email Subject</label>
+                <Input
+                  value={templateDraft.subject}
+                  onChange={(e) => setTemplateDraft({ ...templateDraft, subject: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Post-Click Redirect URL</label>
+                <Input
+                  value={templateDraft.redirectUrl}
+                  onChange={(e) => setTemplateDraft({ ...templateDraft, redirectUrl: e.target.value })}
+                  placeholder="https://login.microsoftonline.com"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Email Body (HTML)</label>
+                <textarea
+                  value={templateDraft.bodyHtml}
+                  onChange={(e) => setTemplateDraft({ ...templateDraft, bodyHtml: e.target.value })}
+                  spellCheck={false}
+                  className="w-full h-64 rounded-md border border-slate-200 p-2 font-mono text-[11px] leading-relaxed text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <p className="text-[10px] text-slate-400 font-normal mt-1">
+                  Use placeholders like {'{{first_name}}'} and {'{{phishing_link}}'} — they are filled in per recipient when the campaign sends.
+                </p>
+              </div>
+            </div>
+            <div className="text-xs">
+              <label className="block text-slate-700 mb-1 font-semibold">Live preview</label>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 p-2 border-b border-slate-200 font-semibold space-y-0.5">
+                  <div><span className="text-slate-400">From:</span> {newCampaign.senderName || 'IT Security Team'}</div>
+                  <div className="truncate"><span className="text-slate-400">Subject:</span> {templateDraft.subject || '(no subject)'}</div>
+                </div>
+                <iframe
+                  title="Edited email preview"
+                  sandbox=""
+                  srcDoc={renderTemplatePreviewHtml({ body: templateDraft.bodyHtml, thumbnail: templates.find(t => (t._id || t.id) === newCampaign.templateId)?.thumbnail })}
+                  className="w-full bg-white"
+                  style={{ height: '340px', border: 'none' }}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setEditTemplateOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setNewCampaign((prev) => ({
+                  ...prev,
+                  subject: templateDraft.subject,
+                  bodyHtml: templateDraft.bodyHtml,
+                  redirectUrl: templateDraft.redirectUrl,
+                }));
+                setEditTemplateOpen(false);
+                toast.success('Template customised for this campaign.');
+              }}
+            >
+              Apply changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Schedule Dialog */}
       <Dialog open={!!scheduleCampaign} onOpenChange={(open) => !open && setScheduleCampaign(null)}>
         <DialogContent className="max-w-sm">
@@ -740,9 +943,12 @@ export default function CampaignsPage() {
               { stage: 'Opened', value: opened, fill: '#f59e0b' },
               { stage: 'Clicked', value: clicked, fill: '#ef4444' },
             ];
+            const openRate = sent > 0 ? Math.round((opened / sent) * 100) : 0;
+            const clickRate = sent > 0 ? Math.round((clicked / sent) * 100) : 0;
+            const clickThrough = opened > 0 ? Math.round((clicked / opened) * 100) : 0;
             return (
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="text-xl font-bold text-slate-900">{sent}</div>
                     <div className="text-[10px] text-slate-500 font-semibold">Sent</div>
@@ -754,6 +960,18 @@ export default function CampaignsPage() {
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="text-xl font-bold text-destructive">{clicked}</div>
                     <div className="text-[10px] text-slate-500 font-semibold">Clicked</div>
+                  </div>
+                  <div className="p-3 bg-amber-50/40 rounded-lg border border-amber-100">
+                    <div className="text-xl font-bold text-amber-600">{openRate}%</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Open rate</div>
+                  </div>
+                  <div className="p-3 bg-red-50/40 rounded-lg border border-red-100">
+                    <div className="text-xl font-bold text-destructive">{clickRate}%</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Click rate</div>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-xl font-bold text-slate-900">{clickThrough}%</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Clicked / opened</div>
                   </div>
                 </div>
 
@@ -774,7 +992,19 @@ export default function CampaignsPage() {
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold text-slate-700 mb-2">Recipient breakdown</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-bold text-slate-700">Recipient breakdown</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 text-[11px]"
+                      onClick={downloadCampaignReportCsv}
+                      disabled={reportLoading || reportRecipients.length === 0}
+                      title="Download this report as CSV"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download CSV
+                    </Button>
+                  </div>
                   <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg">
                     <Table>
                       <TableHeader>

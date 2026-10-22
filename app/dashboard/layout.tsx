@@ -248,12 +248,12 @@ export default function DashboardLayout({
       >
         <div>
           {/* Logo header */}
-          <div className="h-16 flex items-center px-6 border-b border-slate-100 justify-between">
-            <div className="flex items-center gap-2.5 overflow-hidden">
+          <div className="h-20 flex items-center px-5 border-b border-slate-100 justify-between">
+            <div className="flex items-center gap-3 overflow-hidden">
               {brandingReady ? (
-                <Image src={logoUrl} alt={tenantName || 'Company logo'} width={44} height={44} className="h-11 w-11 rounded-md shadow-xs shrink-0 object-contain bg-white" unoptimized={logoUrl !== '/workmate-shield-logo.png'} />
+                <Image src={logoUrl} alt={tenantName || 'Company logo'} width={64} height={64} className="h-16 w-16 rounded-lg shadow-xs shrink-0 object-contain bg-white" unoptimized={logoUrl !== '/workmate-shield-logo.png'} />
               ) : (
-                <div className="h-11 w-11 rounded-md shrink-0 bg-slate-100 animate-pulse" />
+                <div className="h-16 w-16 rounded-lg shrink-0 bg-slate-100 animate-pulse" />
               )}
               {sidebarOpen && (
                 !brandingReady ? (
