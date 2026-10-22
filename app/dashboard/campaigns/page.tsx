@@ -18,7 +18,8 @@ import {
   XCircle,
   BarChart3,
   Pencil,
-  Download
+  Download,
+  FileText
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
@@ -293,6 +294,173 @@ export default function CampaignsPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Build a polished, branded PDF report (vector text via jsPDF - no
+  // html2canvas, so Tailwind v4's oklch colors are a non-issue). Lays out a
+  // maroon header band, KPI cards, an engagement funnel infographic and a
+  // colour-coded recipient table. Libraries are imported lazily so they only
+  // load the first time an admin actually exports.
+  const [pdfExporting, setPdfExporting] = useState(false);
+  const downloadCampaignReportPdf = async () => {
+    if (!reportCampaign) return;
+    setPdfExporting(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
+
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const M = 40;
+
+      const maroon: [number, number, number] = [122, 18, 32];
+      const orange: [number, number, number] = [217, 119, 6];
+      const red: [number, number, number] = [220, 38, 38];
+      const ink: [number, number, number] = [15, 23, 42];
+      const sub: [number, number, number] = [100, 116, 139];
+      const line: [number, number, number] = [226, 232, 240];
+
+      const sent = reportCampaign.sentCount || reportCampaign.sent_count || 0;
+      const clicked = reportCampaign.clickedCount || reportCampaign.clicked_count || 0;
+      const opened = Math.max(reportCampaign.openedCount || reportCampaign.opened_count || 0, clicked);
+      const openRate = sent ? Math.round((opened / sent) * 100) : 0;
+      const clickRate = sent ? Math.round((clicked / sent) * 100) : 0;
+      const ctr = opened ? Math.round((clicked / opened) * 100) : 0;
+
+      // Header band
+      doc.setFillColor(...maroon);
+      doc.rect(0, 0, pageW, 96, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('Phishing Simulation Report', M, 40);
+      doc.setFontSize(13);
+      doc.text(reportCampaign.name || 'Campaign', M, 62);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(doc.splitTextToSize(reportCampaign.subject || '', pageW - M * 2 - 170), M, 80);
+      doc.setFontSize(9);
+      doc.text(`Generated ${new Date().toLocaleString()}`, pageW - M, 40, { align: 'right' });
+      doc.text('Workmate Shield', pageW - M, 56, { align: 'right' });
+
+      let y = 122;
+
+      // KPI cards
+      const cards: [string, string, [number, number, number]][] = [
+        ['Sent', String(sent), ink],
+        ['Opened', String(opened), orange],
+        ['Clicked', String(clicked), red],
+        ['Open rate', `${openRate}%`, orange],
+        ['Click rate', `${clickRate}%`, red],
+        ['Clicked / opened', `${ctr}%`, ink],
+      ];
+      const gap = 10;
+      const cardW = (pageW - M * 2 - gap * 5) / 6;
+      const cardH = 58;
+      cards.forEach((c, i) => {
+        const x = M + i * (cardW + gap);
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(...line);
+        doc.roundedRect(x, y, cardW, cardH, 6, 6, 'FD');
+        doc.setTextColor(...c[2]);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text(c[1], x + cardW / 2, y + 26, { align: 'center' });
+        doc.setTextColor(...sub);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.text(c[0], x + cardW / 2, y + 44, { align: 'center' });
+      });
+      y += cardH + 30;
+
+      // Engagement funnel infographic
+      doc.setTextColor(...ink);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Engagement funnel', M, y);
+      y += 16;
+      const barX = M + 56;
+      const barMax = pageW - M - 90 - barX;
+      const maxVal = Math.max(sent, 1);
+      const funnelRows: [string, number, [number, number, number]][] = [
+        ['Sent', sent, maroon],
+        ['Opened', opened, orange],
+        ['Clicked', clicked, red],
+      ];
+      funnelRows.forEach(([label, val, col]) => {
+        doc.setTextColor(...ink);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(label, M, y + 11);
+        doc.setFillColor(241, 245, 249);
+        doc.roundedRect(barX, y, barMax, 14, 3, 3, 'F');
+        const w = Math.max(2, (val / maxVal) * barMax);
+        doc.setFillColor(...col);
+        doc.roundedRect(barX, y, w, 14, 3, 3, 'F');
+        doc.setTextColor(...ink);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text(`${val}  (${sent ? Math.round((val / sent) * 100) : 0}%)`, barX + barMax + 8, y + 11);
+        y += 22;
+      });
+      y += 12;
+
+      // Recipient table
+      const tableBody = reportRecipients.map((r: any) => {
+        const env = recipientEnvironment(r);
+        const g = env.location.geo;
+        const place = g
+          ? [g.city, g.region, g.countryCode || g.country].filter(Boolean).join(', ')
+          : env.location.proxyOnly ? 'Proxy only' : '-';
+        const who = r.name && r.email ? `${r.name}\n${r.email}` : (r.name || r.email || '-');
+        return [
+          who,
+          recipientDisplayStatus(r),
+          r.opened_at ? new Date(r.opened_at).toLocaleString() : '-',
+          r.clicked_at ? new Date(r.clicked_at).toLocaleString() : '-',
+          [env.device, env.os, env.browser].filter(Boolean).join(' · ') || '-',
+          env.clickIp || env.openIp || '-',
+          place || '-',
+        ];
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Recipient', 'Status', 'Opened', 'Clicked', 'Device', 'IP', 'Location']],
+        body: tableBody.length ? tableBody : [['No recipients on this campaign.', '', '', '', '', '', '']],
+        margin: { left: M, right: M, bottom: 44 },
+        styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 4, textColor: [30, 41, 59], lineColor: line, lineWidth: 0.5, valign: 'middle' },
+        headStyles: { fillColor: maroon, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        alternateRowStyles: { fillColor: [250, 250, 251] },
+        columnStyles: { 0: { cellWidth: 108 }, 1: { cellWidth: 46, halign: 'center' } },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && data.column.index === 1) {
+            const v = String(data.cell.raw);
+            data.cell.styles.fontStyle = 'bold';
+            if (v === 'clicked' || v === 'failed') data.cell.styles.textColor = red;
+            else if (v === 'opened') data.cell.styles.textColor = orange;
+            else data.cell.styles.textColor = sub;
+          }
+        },
+        didDrawPage: () => {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.setTextColor(...sub);
+          const note = 'Location is estimated from the IP address and is approximate; the sub-label is the IP reverse-DNS (ISP gateway), not the device. Hostnames and MAC addresses are never sent to a website.';
+          doc.text(doc.splitTextToSize(note, pageW - M * 2), M, pageH - 30);
+          doc.text(reportCampaign.name || 'Campaign', M, pageH - 14);
+          doc.text(`Page ${(doc.internal as any).getCurrentPageInfo().pageNumber}`, pageW - M, pageH - 14, { align: 'right' });
+        },
+      });
+
+      const safeName = (reportCampaign.name || 'campaign').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      doc.save(`${safeName}-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err: any) {
+      toast.error('Failed to generate PDF: ' + err.message);
+    } finally {
+      setPdfExporting(false);
+    }
   };
 
   const handleDeleteCampaignClick = (id: string) => {
@@ -951,27 +1119,27 @@ export default function CampaignsPage() {
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="text-xl font-bold text-slate-900">{sent}</div>
-                    <div className="text-[10px] text-slate-500 font-semibold">Sent</div>
+                    <div className="text-[10px] text-slate-600 font-semibold">Sent</div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="text-xl font-bold text-amber-600">{opened}</div>
-                    <div className="text-[10px] text-slate-500 font-semibold">Opened</div>
+                    <div className="text-[10px] text-slate-600 font-semibold">Opened</div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="text-xl font-bold text-destructive">{clicked}</div>
-                    <div className="text-[10px] text-slate-500 font-semibold">Clicked</div>
+                    <div className="text-[10px] text-slate-600 font-semibold">Clicked</div>
                   </div>
                   <div className="p-3 bg-amber-50/40 rounded-lg border border-amber-100">
                     <div className="text-xl font-bold text-amber-600">{openRate}%</div>
-                    <div className="text-[10px] text-slate-500 font-semibold">Open rate</div>
+                    <div className="text-[10px] text-slate-600 font-semibold">Open rate</div>
                   </div>
                   <div className="p-3 bg-red-50/40 rounded-lg border border-red-100">
                     <div className="text-xl font-bold text-destructive">{clickRate}%</div>
-                    <div className="text-[10px] text-slate-500 font-semibold">Click rate</div>
+                    <div className="text-[10px] text-slate-600 font-semibold">Click rate</div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="text-xl font-bold text-slate-900">{clickThrough}%</div>
-                    <div className="text-[10px] text-slate-500 font-semibold">Clicked / opened</div>
+                    <div className="text-[10px] text-slate-600 font-semibold">Clicked / opened</div>
                   </div>
                 </div>
 
@@ -993,22 +1161,35 @@ export default function CampaignsPage() {
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-bold text-slate-700">Recipient breakdown</h4>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1.5 text-[11px]"
-                      onClick={downloadCampaignReportCsv}
-                      disabled={reportLoading || reportRecipients.length === 0}
-                      title="Download this report as CSV"
-                    >
-                      <Download className="h-3.5 w-3.5" /> Download CSV
-                    </Button>
+                    <h4 className="text-sm font-bold text-slate-900">Recipient breakdown</h4>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={downloadCampaignReportPdf}
+                        loading={pdfExporting}
+                        disabled={reportLoading || reportRecipients.length === 0}
+                        title="Download a full PDF report"
+                      >
+                        <FileText className="h-3.5 w-3.5" /> Download PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={downloadCampaignReportCsv}
+                        disabled={reportLoading || reportRecipients.length === 0}
+                        title="Download the raw data as CSV"
+                      >
+                        <Download className="h-3.5 w-3.5" /> CSV
+                      </Button>
+                    </div>
                   </div>
                   <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg">
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className="bg-slate-50 [&>th]:h-10 [&>th]:text-slate-700 [&>th]:font-semibold">
                           <TableHead>Recipient</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Opened</TableHead>
@@ -1040,40 +1221,40 @@ export default function CampaignsPage() {
                             return (
                             <TableRow key={r._id || r.id || idx}>
                               <TableCell>
-                                <div className="font-semibold text-slate-800">{r.name || r.email}</div>
-                                <div className="text-[10px] text-slate-400">{r.email}</div>
+                                <div className="font-semibold text-slate-900">{r.name || r.email}</div>
+                                <div className="text-[11px] text-slate-500">{r.email}</div>
                               </TableCell>
                               <TableCell>
                                 <Badge variant={status === 'clicked' || status === 'failed' ? 'danger' : status === 'opened' ? 'warning' : 'secondary'}>
                                   {status}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-xs text-slate-500">
+                              <TableCell className="text-xs text-slate-700">
                                 {r.opened_at ? new Date(r.opened_at).toLocaleString() : '-'}
                                 {r.opened_at && (
-                                  <div className="text-[10px] text-slate-400">
+                                  <div className="text-[10px] text-slate-500">
                                     {openCount > 0 ? `${openCount}× tracked` : 'inferred from click'}
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs text-slate-500">
+                              <TableCell className="text-xs text-slate-700">
                                 {r.clicked_at ? new Date(r.clicked_at).toLocaleString() : '-'}
                                 {clickCount > 0 && (
-                                  <div className="text-[10px] text-slate-400">{clickCount}× clicked</div>
+                                  <div className="text-[10px] text-slate-500">{clickCount}× clicked</div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs text-slate-500">
+                              <TableCell className="text-xs text-slate-700">
                                 {env.device || env.os || env.browser
                                   ? [env.device, env.os, env.browser].filter(Boolean).join(' · ')
                                   : '-'}
                               </TableCell>
-                              <TableCell className="text-[11px] text-slate-500 font-mono">
+                              <TableCell className="text-[11px] text-slate-700 font-mono">
                                 {env.clickIp && <div>Click: {env.clickIp}</div>}
                                 {env.openIp && (
                                   <div>
                                     Open: {env.openIp}
                                     {env.openViaProxy && (
-                                      <span className="font-sans text-[10px] text-slate-400"> (Gmail proxy)</span>
+                                      <span className="font-sans text-[10px] text-slate-500"> (Gmail proxy)</span>
                                     )}
                                   </div>
                                 )}
@@ -1085,7 +1266,7 @@ export default function CampaignsPage() {
                                   const place = [g.city, g.region, g.countryCode || g.country].filter(Boolean).join(', ');
                                   return (
                                     <div className="space-y-0.5">
-                                      <div className="font-medium text-slate-700">{place || '-'}</div>
+                                      <div className="font-semibold text-slate-900">{place || '-'}</div>
                                       {g.lat !== null && g.lon !== null && (
                                         <a
                                           href={`https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lon}#map=10/${g.lat}/${g.lon}`}
@@ -1096,16 +1277,16 @@ export default function CampaignsPage() {
                                           {g.lat.toFixed(3)}, {g.lon.toFixed(3)}
                                         </a>
                                       )}
-                                      {g.isp && <div className="text-[10px] text-slate-400">{g.isp}</div>}
+                                      {g.isp && <div className="text-[10px] text-slate-500">{g.isp}</div>}
                                       {g.hostname && (
-                                        <div className="text-[10px] text-slate-400 font-mono break-all" title={g.hostname}>
+                                        <div className="text-[10px] text-slate-500 font-mono break-all" title={g.hostname}>
                                           {g.hostname}
                                         </div>
                                       )}
                                     </div>
                                   );
                                 })() : env.location.proxyOnly ? (
-                                  <span className="text-[10px] text-slate-400">Only seen via Gmail's image proxy - no real location</span>
+                                  <span className="text-[10px] text-slate-500">Only seen via Gmail's image proxy - no real location</span>
                                 ) : (
                                   '-'
                                 )}
@@ -1117,7 +1298,7 @@ export default function CampaignsPage() {
                       </TableBody>
                     </Table>
                   </div>
-                  <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+                  <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
                     Location is estimated from the IP address: usually the nearest ISP hub, often tens of
                     kilometres off, and unreliable for VPNs and mobile networks. The name shown under it is
                     the IP&apos;s reverse-DNS name (typically the ISP&apos;s gateway), not the device&apos;s own
