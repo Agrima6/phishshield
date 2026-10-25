@@ -11,11 +11,39 @@ import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 const schema = zod.object({
-  company_name: zod.string().min(1, 'Company name is required'),
-  contact_name: zod.string().min(1, 'Contact person is required'),
-  contact_email: zod.string().email('Enter a valid email address'),
-  contact_mobile: zod.string().optional(),
-  designation: zod.string().optional(),
+  company_name: zod
+    .string()
+    .trim()
+    .min(2, 'Company name is required')
+    .max(100, 'Company name is too long'),
+  contact_name: zod
+    .string()
+    .trim()
+    .min(2, 'Please enter your full name')
+    .max(60, 'Name is too long')
+    .regex(/^[A-Za-z][A-Za-z .'-]*$/, 'Name can only contain letters, spaces, . - and \''),
+  contact_email: zod
+    .string()
+    .trim()
+    .min(1, 'Work email is required')
+    .email('Enter a valid email address (e.g. abc@company.com)')
+    .max(120, 'Email is too long'),
+  contact_mobile: zod
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (v) => !v || /^(\+\d{1,3})?\d{10}$/.test(v.replace(/[\s-]/g, '')),
+      'Enter a valid 10-digit mobile number (optional +country code, no more than 10 digits)',
+    ),
+  designation: zod
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (v) => !v || /^[A-Za-z][A-Za-z .&/'-]{1,49}$/.test(v),
+      'Designation can only contain letters (no numbers)',
+    ),
 });
 
 type FormValues = zod.infer<typeof schema>;
@@ -76,12 +104,12 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Company name <span className="text-destructive">*</span></label>
-            <Input placeholder="Please enter your company name" error={!!errors.company_name} {...register('company_name')} />
+            <Input maxLength={100} placeholder="Please enter your company name" error={!!errors.company_name} {...register('company_name')} />
             {errors.company_name && <p className="text-xs text-destructive mt-1">{errors.company_name.message}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Contact person <span className="text-destructive">*</span></label>
-            <Input placeholder="Please enter your full name" error={!!errors.contact_name} {...register('contact_name')} />
+            <Input maxLength={60} placeholder="Please enter your full name" error={!!errors.contact_name} {...register('contact_name')} />
             {errors.contact_name && <p className="text-xs text-destructive mt-1">{errors.contact_name.message}</p>}
           </div>
           <div>
@@ -96,11 +124,24 @@ export default function RegisterPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile number</label>
-              <Input placeholder="Please enter your mobile number" {...register('contact_mobile')} />
+              <Input
+                inputMode="tel"
+                maxLength={16}
+                placeholder="Please enter your mobile number"
+                error={!!errors.contact_mobile}
+                {...register('contact_mobile')}
+              />
+              {errors.contact_mobile && <p className="text-xs text-destructive mt-1">{errors.contact_mobile.message}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Designation</label>
-              <Input placeholder="Please enter your designation" {...register('designation')} />
+              <Input
+                maxLength={50}
+                placeholder="Please enter your designation"
+                error={!!errors.designation}
+                {...register('designation')}
+              />
+              {errors.designation && <p className="text-xs text-destructive mt-1">{errors.designation.message}</p>}
             </div>
           </div>
           <Button type="submit" className="w-full" loading={loading}>
