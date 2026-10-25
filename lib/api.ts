@@ -44,6 +44,7 @@ export function mapBackendToTenantSettings(backend: any): TenantSettings {
     branding: {
       primaryColor: backend.branding?.primary_color || '#d97706',
       logoUrl: backend.branding?.logo_url || '',
+      tagline: backend.branding?.tagline || '',
     },
     sso: {
       clientId: backend.sso_config?.client_id || '',
@@ -78,6 +79,7 @@ export function mapTenantSettingsToBackend(settings: TenantSettings): any {
     branding: {
       logo_url: settings.branding.logoUrl || '',
       primary_color: settings.branding.primaryColor,
+      tagline: settings.branding.tagline || '',
       base_url: typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}` : '',
     },
     sso_config: {

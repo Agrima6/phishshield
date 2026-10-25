@@ -349,6 +349,21 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
+                      <div>
+                        <label className="block text-slate-700 mb-1">Redirect Page Tagline</label>
+                        <Input
+                          value={settings.branding.tagline || ''}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            branding: { ...settings.branding, tagline: e.target.value }
+                          })}
+                          placeholder="Build. Grow. Together."
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Shown beneath your company name on the post-click redirect page. Leave blank to use the default.
+                        </p>
+                      </div>
+
                       <Button type="submit" size="sm">
                         Save Branding Settings
                       </Button>

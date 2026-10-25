@@ -25,6 +25,7 @@ export interface TenantSettings {
   branding: {
     primaryColor: string;
     logoUrl?: string;
+    tagline?: string;
   };
   sso: {
     clientId?: string;
