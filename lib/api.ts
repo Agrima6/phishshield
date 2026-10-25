@@ -242,6 +242,12 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ notes }) }
       );
     },
+    resendOnboarding: async (id: string) => {
+      return fetcher<{ registration: any; email_warning?: string }>(
+        `/api/admin/registrations/${id}/resend-onboarding`,
+        { method: 'POST' }
+      );
+    },
   },
 
   team: {

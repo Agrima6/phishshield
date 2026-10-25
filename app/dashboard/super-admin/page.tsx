@@ -77,6 +77,8 @@ export default function SuperAdminPage() {
   const [reviewTarget, setReviewTarget] = useState<RegistrationRow | null>(null);
   const [showChangeNotes, setShowChangeNotes] = useState(false);
   const [changeNotes, setChangeNotes] = useState('');
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [regFilter, setRegFilter] = useState<'ALL' | 'SUBMITTED' | 'PENDING_ONBOARDING' | 'CHANGES_REQUESTED' | 'APPROVED' | 'REJECTED'>('ALL');
 
   const [viewTarget, setViewTarget] = useState<TenantRow | null>(null);
   const [viewDetail, setViewDetail] = useState<any>(null);
@@ -185,6 +187,27 @@ export default function SuperAdminPage() {
     const d = new Date(s);
     return isNaN(d.getTime()) ? '—' : d.toLocaleString();
   };
+
+  const handleResend = async (reg: RegistrationRow) => {
+    setResendingId(reg.id);
+    try {
+      const res = await api.adminRegistrations.resendOnboarding(reg.id);
+      if (res.email_warning) toast.warning(res.email_warning);
+      else toast.success(`Onboarding reminder sent to ${reg.contact_email}.`);
+      setReviewTarget(null);
+      loadRegistrations();
+    } catch (err: any) {
+      toast.error('Failed to resend: ' + err.message);
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const regCounts = registrations.reduce((acc: Record<string, number>, r) => {
+    acc[r.status] = (acc[r.status] || 0) + 1;
+    return acc;
+  }, {});
+  const filteredRegs = regFilter === 'ALL' ? registrations : registrations.filter((r) => r.status === regFilter);
 
   const handleOnboard = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,9 +318,32 @@ export default function SuperAdminPage() {
             <ClipboardList className="h-4 w-4 text-primary" /> Company Registrations
           </CardTitle>
           <CardDescription className="text-xs">
-            Companies that registered themselves and completed onboarding, awaiting your approval. Approving
-            creates their tenant and emails their first admin a login.
+            Companies that registered themselves. Review each one, then approve, request changes, or reject —
+            approving creates their tenant and emails their first admin a login. Follow up on pending onboardings
+            with a reminder.
           </CardDescription>
+          <div className="flex flex-wrap items-center gap-1.5 pt-3">
+            {([
+              ['ALL', 'All'],
+              ['SUBMITTED', 'Awaiting review'],
+              ['PENDING_ONBOARDING', 'Pending onboarding'],
+              ['CHANGES_REQUESTED', 'Changes requested'],
+              ['APPROVED', 'Approved'],
+              ['REJECTED', 'Rejected'],
+            ] as [typeof regFilter, string][]).map(([key, label]) => {
+              const count = key === 'ALL' ? registrations.length : (regCounts[key] || 0);
+              const active = regFilter === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setRegFilter(key)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors ${active ? 'bg-slate-900 border-slate-950 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  {label} <span className={active ? 'text-white/70' : 'text-slate-400'}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {registrationsLoading ? (
@@ -313,12 +359,20 @@ export default function SuperAdminPage() {
                 <TableRow>
                   <TableHead>Company</TableHead>
                   <TableHead>Contact</TableHead>
+                  <TableHead>Registered</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registrations.map((reg) => (
+                {filteredRegs.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6 text-slate-400 text-xs">
+                      No companies in this view.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {filteredRegs.map((reg) => (
                   <TableRow key={reg.id} onClick={() => openReview(reg)} className="cursor-pointer hover:bg-slate-50">
                     <TableCell className="py-3">
                       <div className="flex items-center gap-2">
@@ -335,6 +389,12 @@ export default function SuperAdminPage() {
                     <TableCell className="text-slate-600 text-xs py-3">
                       <div>{reg.contact_name}</div>
                       <div className="text-[10px] text-slate-400">{reg.contact_email}</div>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 py-3">
+                      <div>{fmtDate(reg.created_at)}</div>
+                      {reg.submitted_at && (
+                        <div className="text-[10px] text-slate-400">Submitted {fmtDate(reg.submitted_at)}</div>
+                      )}
                     </TableCell>
                     <TableCell className="py-3">
                       <Badge variant={reg.status === 'SUBMITTED' ? 'info' : reg.status === 'APPROVED' ? 'success' : reg.status === 'REJECTED' ? 'danger' : reg.status === 'CHANGES_REQUESTED' ? 'warning' : 'secondary'} className="text-[10px]">
@@ -722,7 +782,14 @@ export default function SuperAdminPage() {
                 </>
               )
             ) : (
-              <Button size="sm" onClick={() => setReviewTarget(null)}>Close</Button>
+              <>
+                {reviewTarget && (reviewTarget.status === 'PENDING_ONBOARDING' || reviewTarget.status === 'CHANGES_REQUESTED') && (
+                  <Button variant="outline" size="sm" className="sm:mr-auto" loading={resendingId === reviewTarget.id} onClick={() => handleResend(reviewTarget)}>
+                    <Mail className="h-4 w-4 mr-1" /> Send reminder
+                  </Button>
+                )}
+                <Button size="sm" onClick={() => setReviewTarget(null)}>Close</Button>
+              </>
             )}
           </DialogFooter>
         </DialogContent>
