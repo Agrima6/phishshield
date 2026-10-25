@@ -70,14 +70,44 @@ export default function DashboardLayout({
   // own branding (fetched async below) has a chance to load in.
   const [brandingReady, setBrandingReady] = useState(false);
 
-  // Notifications state
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: "Simulation Campaign 'Q2 Assessment' is running.", time: '5 mins ago', read: false },
-    { id: 2, text: 'Microsoft Entra ID configurations rotated.', time: '1 hour ago', read: false },
-    { id: 3, text: 'New phishing template package loaded.', time: '1 day ago', read: true }
-  ]);
+  // Notifications state - sourced live from the audit activity log.
+  const [notifications, setNotifications] = useState<{ id: string; text: string; time: string; ts: number; category: string }[]>([]);
+  const [lastSeenNotif, setLastSeenNotif] = useState<number>(() => {
+    try { return Number(localStorage.getItem('phish_notif_seen') || 0); } catch { return 0; }
+  });
 
   const [adminTenants, setAdminTenants] = useState<{ id: string; name: string }[]>([]);
+
+  // Live activity feed for the bell: campaign sends, employees added,
+  // templates changed, SMTP updates, etc., read from the audit log and
+  // refreshed on an interval so new events show without a page reload.
+  const relTime = (iso: string) => {
+    const d = new Date(iso || 0).getTime();
+    if (!d) return '';
+    const s = Math.floor((Date.now() - d) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} hr ago`;
+    const days = Math.floor(s / 86400);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  };
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const logs = await api.auditLogs.list();
+        if (!active) return;
+        const mapped = (logs || []).map((l: any) => {
+          const ts = new Date(l.timestamp || 0).getTime() || 0;
+          return { id: String(l._id || l.id || ts), text: l.message || 'Activity', time: relTime(l.timestamp), ts, category: l.category || '' };
+        }).sort((a, b) => b.ts - a.ts).slice(0, 25);
+        setNotifications(mapped);
+      } catch { /* audit log may be forbidden for some roles - ignore */ }
+    };
+    load();
+    const t = setInterval(load, 60000);
+    return () => { active = false; clearInterval(t); };
+  }, []);
 
   useEffect(() => {
     if (loginTenant === 'default') {
@@ -193,14 +223,12 @@ export default function DashboardLayout({
     { name: 'Help Center', href: '/dashboard/help', icon: HelpCircle },
   ];
 
-  // Helper to mark notification as read
-  const markAsRead = (id: number) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+  const unreadCount = notifications.filter(n => n.ts > lastSeenNotif).length;
+  const markAllNotificationsRead = () => {
+    const newest = notifications[0]?.ts || Date.now();
+    setLastSeenNotif(newest);
+    try { localStorage.setItem('phish_notif_seen', String(newest)); } catch { /* ignore */ }
   };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-800 antialiased font-sans">
@@ -438,29 +466,35 @@ export default function DashboardLayout({
                 <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-lg shadow-lg z-50 p-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
                     <span className="font-semibold text-xs text-slate-800">Alert Notifications</span>
-                    <button 
-                      onClick={() => {
-                        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-                        toast.success('All notifications marked as read.');
-                      }}
+                    <button
+                      onClick={() => { markAllNotificationsRead(); toast.success('All notifications marked as read.'); }}
                       className="text-[10px] text-primary hover:underline font-medium"
                     >
                       Mark all read
                     </button>
                   </div>
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {notifications.map((notif) => (
-                      <div 
-                        key={notif.id} 
-                        onClick={() => markAsRead(notif.id)}
-                        className={`p-2 rounded-lg text-xs transition-colors cursor-pointer ${
-                          notif.read ? 'bg-slate-50' : 'bg-amber-50/50 hover:bg-amber-50'
-                        }`}
-                      >
-                        <p className="text-slate-700">{notif.text}</p>
-                        <span className="text-[10px] text-slate-400 mt-1 block">{notif.time}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 text-center py-6">No recent activity yet.</p>
+                    ) : notifications.map((notif) => {
+                      const unread = notif.ts > lastSeenNotif;
+                      return (
+                        <div
+                          key={notif.id}
+                          className={`p-2 rounded-lg text-xs ${unread ? 'bg-amber-50/60' : 'bg-slate-50'}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {unread && <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
+                            <div className="min-w-0">
+                              <p className="text-slate-700 leading-snug">{notif.text}</p>
+                              <span className="text-[10px] text-slate-400 mt-0.5 block">
+                                {notif.time}{notif.category ? ` · ${notif.category}` : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -478,18 +512,32 @@ export default function DashboardLayout({
               </button>
 
               {profileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 text-xs">
-                  <div className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700">
-                    {username}
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 text-xs">
+                  <div className="px-3 py-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-xs text-primary shrink-0">
+                        {(tenantName || username).substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-800 truncate">{tenantName || 'Organization'}</div>
+                        <div className="text-[10px] text-slate-500 truncate">{username}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[9px] font-bold uppercase tracking-wide text-slate-600">{role}</span>
+                      {loginTenant === 'default' && (
+                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[9px] font-bold uppercase tracking-wide text-primary">Super Admin</span>
+                      )}
+                    </div>
                   </div>
-                  <a href="/settings/profile" className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-50">
+                  <a href="/dashboard/settings/profile" className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-50">
                     <User className="h-3.5 w-3.5" /> My Profile
                   </a>
-                  <a href="/settings" className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-50">
+                  <a href="/dashboard/settings" className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-50">
                     <Settings className="h-3.5 w-3.5" /> Tenant Settings
                   </a>
-                  <button 
-                    onClick={logout} 
+                  <button
+                    onClick={logout}
                     className="flex w-full items-center gap-2 px-3 py-2 text-destructive hover:bg-slate-50 text-left border-t border-slate-100"
                   >
                     <LogOut className="h-3.5 w-3.5" /> Sign Out
