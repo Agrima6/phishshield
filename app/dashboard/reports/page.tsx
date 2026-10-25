@@ -47,7 +47,12 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
 }
 
 function downloadCsv(filename: string, rows: (string | number)[][]) {
-  const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const esc = (cell: string | number) => {
+    const s = cell === null || cell === undefined ? '' : String(cell);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  // UTF-8 BOM + CRLF so Excel opens it with values in the correct columns.
+  const csv = '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n') + '\r\n';
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -275,14 +280,14 @@ export default function ReportsPage() {
               onClick={() => handleExportReport('csv')}
               className="flex items-center gap-1 bg-white/10 text-white border-white/20 hover:bg-white/20"
             >
-              <FileSpreadsheet className="h-4 w-4" /> Export CSV
+              <FileSpreadsheet className="h-4 w-4" /> Download CSV
             </Button>
             <Button
               size="sm"
               onClick={() => handleExportReport('pdf')}
               className="flex items-center gap-1 bg-white text-primary hover:bg-white/90"
             >
-              <FileText className="h-4 w-4" /> Export PDF Report
+              <FileText className="h-4 w-4" /> Download PDF
             </Button>
           </>
         }

@@ -343,19 +343,9 @@ export default function CampaignsPage() {
         g?.lat ?? '', g?.lon ?? '', g?.isp || '', g?.hostname || '',
       ].map(esc).join(',');
     });
-    const sent = reportCampaign.sentCount || reportCampaign.sent_count || 0;
-    const clicked = reportCampaign.clickedCount || reportCampaign.clicked_count || 0;
-    const opened = Math.max(reportCampaign.openedCount || reportCampaign.opened_count || 0, clicked);
-    const summary = [
-      `# Campaign,${esc(reportCampaign.name)}`,
-      `# Subject,${esc(reportCampaign.subject)}`,
-      `# Exported,${new Date().toISOString()}`,
-      `# Sent,${sent}`,
-      `# Opened,${opened}`,
-      `# Clicked,${clicked}`,
-      '',
-    ].join('\n');
-    const csv = summary + headers.join(',') + '\n' + rows.join('\n') + '\n';
+    // A single clean table (no mixed-width comment block) with a UTF-8 BOM so
+    // it opens correctly in Excel with every value in the right column.
+    const csv = '﻿' + headers.join(',') + '\r\n' + rows.join('\r\n') + '\r\n';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1569,7 +1559,7 @@ export default function CampaignsPage() {
                         disabled={reportLoading || reportRecipients.length === 0}
                         title="Download the raw data as CSV"
                       >
-                        <Download className="h-3.5 w-3.5" /> CSV
+                        <Download className="h-3.5 w-3.5" /> Download CSV
                       </Button>
                     </div>
                   </div>
