@@ -68,6 +68,9 @@ export default function DashboardLayout({
   const [sessionTimeoutActive, setSessionTimeoutActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [logoUrl, setLogoUrl] = useState('/workmate-shield-logo.png');
+  // The live tenant name from the backend (reflects renames immediately on any
+  // load), falling back to the session value until it's fetched.
+  const [tenantDisplayName, setTenantDisplayName] = useState('');
   // Avoids a flash of the default Workmate Shield logo before the tenant's
   // own branding (fetched async below) has a chance to load in.
   const [brandingReady, setBrandingReady] = useState(false);
@@ -173,6 +176,10 @@ export default function DashboardLayout({
         if (customLogo) {
           setLogoUrl(customLogo.startsWith('/') ? `${API_BASE}${customLogo}` : customLogo);
         }
+        if (settings.name) {
+          setTenantDisplayName(settings.name);
+          try { localStorage.setItem('phish_tenant_name', settings.name); } catch { /* ignore */ }
+        }
       })
       .catch(() => {
         // Tenant settings unreachable, keep the default theme and logo.
@@ -241,6 +248,7 @@ export default function DashboardLayout({
   ];
 
   const unreadCount = notifications.filter(n => n.ts > lastSeenNotif).length;
+  const displayTenant = tenantDisplayName || tenantName;
   const markAllNotificationsRead = () => {
     const newest = notifications[0]?.ts || Date.now();
     setLastSeenNotif(newest);
@@ -296,7 +304,7 @@ export default function DashboardLayout({
           <div className="h-20 flex items-center px-5 border-b border-slate-100 justify-between">
             <div className="flex items-center gap-3 overflow-hidden">
               {brandingReady ? (
-                <Image src={logoUrl} alt={tenantName || 'Company logo'} width={64} height={64} className="h-16 w-16 rounded-lg shadow-xs shrink-0 object-contain bg-white" unoptimized={logoUrl !== '/workmate-shield-logo.png'} />
+                <Image src={logoUrl} alt={displayTenant || 'Company logo'} width={64} height={64} className="h-16 w-16 rounded-lg shadow-xs shrink-0 object-contain bg-white" unoptimized={logoUrl !== '/workmate-shield-logo.png'} />
               ) : (
                 <div className="h-16 w-16 rounded-lg shrink-0 bg-slate-100 animate-pulse" />
               )}
@@ -309,7 +317,7 @@ export default function DashboardLayout({
                   </span>
                 ) : (
                   <span className="font-bold text-xs tracking-wider text-slate-900 truncate">
-                    {tenantName}
+                    {displayTenant}
                   </span>
                 )
               )}
@@ -327,7 +335,7 @@ export default function DashboardLayout({
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold">
                 <div className="flex items-center gap-2 truncate">
                   <Globe className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="truncate">{tenantName || 'Default Tenant'}</span>
+                  <span className="truncate">{displayTenant || 'Default Tenant'}</span>
                 </div>
                 {sidebarOpen && loginTenant === 'default' && adminTenants.length > 0 && (
                   <select 
@@ -535,10 +543,10 @@ export default function DashboardLayout({
                   <div className="px-3 py-3 border-b border-slate-100">
                     <div className="flex items-center gap-2.5">
                       <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-xs text-primary shrink-0">
-                        {(tenantName || username).substring(0, 2).toUpperCase()}
+                        {(displayTenant || username).substring(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-semibold text-slate-800 truncate">{tenantName || 'Organization'}</div>
+                        <div className="font-semibold text-slate-800 truncate">{displayTenant || 'Organization'}</div>
                         <div className="text-[10px] text-slate-500 truncate">{username}</div>
                       </div>
                     </div>
