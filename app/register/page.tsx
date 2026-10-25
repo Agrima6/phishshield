@@ -33,8 +33,8 @@ const schema = zod.object({
     .trim()
     .optional()
     .refine(
-      (v) => !v || /^\d{10}$/.test(v),
-      'Enter a valid 10-digit mobile number.',
+      (v) => !v || /^6\d{9}$/.test(v),
+      'Mobile number must start with 6 and be 10 digits.',
     ),
   designation: zod
     .string()
@@ -92,9 +92,9 @@ export default function RegisterPage() {
             <span className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
               <ShieldCheck className="h-5 w-5" />
             </span>
-            <span className="text-xs font-semibold uppercase tracking-wide">Register your company</span>
+            <span className="text-xs font-semibold uppercase tracking-wide">Register Your Company</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-1.5">Get started with Workmate Shield</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1.5">Get Started With Workmate Shield</h1>
           <p className="text-sm text-slate-500 leading-relaxed">
             We&apos;d be glad to welcome your organization. Please share a few details below, and we&apos;ll
             send a secure setup link to your work email so you can complete onboarding in just a few minutes.
@@ -103,17 +103,17 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Company name <span className="text-destructive">*</span></label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Company Name <span className="text-destructive">*</span></label>
             <Input maxLength={100} placeholder="Please enter your company name" error={!!errors.company_name} {...register('company_name')} />
             {errors.company_name && <p className="text-xs text-destructive mt-1">{errors.company_name.message}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Contact person <span className="text-destructive">*</span></label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Contact Person <span className="text-destructive">*</span></label>
             <Input maxLength={60} placeholder="Please enter your full name" error={!!errors.contact_name} {...register('contact_name')} />
             {errors.contact_name && <p className="text-xs text-destructive mt-1">{errors.contact_name.message}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Work email <span className="text-destructive">*</span></label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Work Email <span className="text-destructive">*</span></label>
             <Input type="email" placeholder="abc@company.com" error={!!errors.contact_email} {...register('contact_email')} />
             {errors.contact_email ? (
               <p className="text-xs text-destructive mt-1">{errors.contact_email.message}</p>
@@ -123,7 +123,7 @@ export default function RegisterPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile number</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile Number</label>
               <Input
                 inputMode="numeric"
                 maxLength={10}
@@ -155,7 +155,7 @@ export default function RegisterPage() {
             </div>
           </div>
           <Button type="submit" className="w-full" loading={loading}>
-            Submit registration
+            Submit
           </Button>
           <p className="text-[11px] text-center text-slate-400">
             No credit card required. Your details stay private and are used only to set up your account.
