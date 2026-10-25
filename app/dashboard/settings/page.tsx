@@ -72,7 +72,12 @@ export default function SettingsPage() {
 
     try {
       await api.settings.save(settings);
-      toast.success('Branding and accent settings updated successfully.');
+      // Keep the session's tenant name in sync so the sidebar and everywhere
+      // else reflect the new workspace name, then refresh so the updated name,
+      // logo and accent colour apply across the app without a manual reload.
+      try { localStorage.setItem('phish_tenant_name', settings.name || ''); } catch { /* ignore */ }
+      toast.success('Branding and accent settings updated. Refreshing…');
+      setTimeout(() => window.location.reload(), 700);
     } catch (err: any) {
       toast.error('Failed to save branding settings: ' + err.message);
     }
@@ -93,7 +98,8 @@ export default function SettingsPage() {
       const updated = { ...settings, branding: { ...settings.branding, logoUrl: res.url } };
       setSettings(updated);
       await api.settings.save(updated);
-      toast.success('Logo updated. It now appears in the dashboard and PDF reports.');
+      toast.success('Logo updated. Refreshing…');
+      setTimeout(() => window.location.reload(), 700);
     } catch (err: any) {
       toast.error('Failed to upload logo: ' + err.message);
     } finally {
@@ -107,7 +113,8 @@ export default function SettingsPage() {
     setSettings(updated);
     try {
       await api.settings.save(updated);
-      toast.success('Reverted to the default Workmate Shield logo.');
+      toast.success('Reverted to the default Workmate Shield logo. Refreshing…');
+      setTimeout(() => window.location.reload(), 700);
     } catch (err: any) {
       toast.error('Failed to remove logo: ' + err.message);
     }
@@ -285,12 +292,15 @@ export default function SettingsPage() {
                         Shown in the dashboard sidebar and on PDF reports in place of the default Workmate Shield logo. Workmate Shield branding stays visible as &quot;Powered by&quot; text either way.
                       </p>
                       <div className="flex items-center gap-3">
-                        <div className="h-14 w-14 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="h-16 w-16 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 p-1">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={settings.branding.logoUrl ? `${API_BASE}${settings.branding.logoUrl}` : '/workmate-shield-logo.png'}
+                            src={settings.branding.logoUrl
+                              ? (settings.branding.logoUrl.startsWith('/') ? `${API_BASE}${settings.branding.logoUrl}` : settings.branding.logoUrl)
+                              : '/workmate-shield-logo.png'}
                             alt="Current logo"
                             className="h-full w-full object-contain"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/workmate-shield-logo.png'; }}
                           />
                         </div>
                         <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors">
