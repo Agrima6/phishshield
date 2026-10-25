@@ -116,13 +116,6 @@ export default function OnboardingPage() {
 
   const gstEntered = gstNumber.trim().length > 0;
   const gstOk = !gstEntered || isGstValid(gstNumber);
-  const fieldsDone = [
-    !!address.trim(),
-    gstEntered && isGstValid(gstNumber),
-    !!employeeCount.trim(),
-    !!logoUrl,
-  ];
-  const pct = Math.round((fieldsDone.filter(Boolean).length / fieldsDone.length) * 100);
 
   const readOnlyInfo: [string, string][] = [
     ['Company', companyName],
@@ -135,7 +128,7 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-12">
       <div className="max-w-2xl mx-auto">
-        {/* Header with completion progress */}
+        {/* Header */}
         <div className="bg-white rounded-t-2xl border border-b-0 border-slate-200 shadow-sm px-8 pt-8 pb-5">
           <div className="flex items-center gap-2 text-primary mb-2">
             <ShieldCheck className="h-5 w-5" />
@@ -145,15 +138,6 @@ export default function OnboardingPage() {
           <p className="text-sm text-slate-500">
             Confirm your details and add a few company specifics. Your submission then goes to our team for review.
           </p>
-          <div className="mt-5">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-semibold text-slate-600">Profile completion</span>
-              <span className="text-xs font-bold text-primary">{pct}%</span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-              <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${pct}%` }} />
-            </div>
-          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-b-2xl border border-slate-200 shadow-sm px-8 pb-8 pt-6 space-y-6">

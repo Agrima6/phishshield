@@ -33,8 +33,8 @@ const schema = zod.object({
     .trim()
     .optional()
     .refine(
-      (v) => !v || /^(\+\d{1,3})?\d{10}$/.test(v.replace(/[\s-]/g, '')),
-      'Enter a valid 10-digit mobile number (optional +country code, no more than 10 digits)',
+      (v) => !v || /^\d{10}$/.test(v),
+      'Enter a valid 10-digit mobile number.',
     ),
   designation: zod
     .string()
@@ -125,11 +125,16 @@ export default function RegisterPage() {
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile number</label>
               <Input
-                inputMode="tel"
-                maxLength={16}
+                inputMode="numeric"
+                maxLength={10}
                 placeholder="Please enter your mobile number"
                 error={!!errors.contact_mobile}
                 {...register('contact_mobile')}
+                onChange={(e) => {
+                  // Allow digits only, hard-capped at 10.
+                  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  register('contact_mobile').onChange(e);
+                }}
               />
               {errors.contact_mobile && <p className="text-xs text-destructive mt-1">{errors.contact_mobile.message}</p>}
             </div>
@@ -140,6 +145,11 @@ export default function RegisterPage() {
                 placeholder="Please enter your designation"
                 error={!!errors.designation}
                 {...register('designation')}
+                onChange={(e) => {
+                  // Letters and basic punctuation only - strip any digits.
+                  e.target.value = e.target.value.replace(/[0-9]/g, '');
+                  register('designation').onChange(e);
+                }}
               />
               {errors.designation && <p className="text-xs text-destructive mt-1">{errors.designation.message}</p>}
             </div>
