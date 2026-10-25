@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { ChatbotWidget } from '@/components/chatbot-widget';
 import { useRouter, usePathname } from 'next/navigation';
@@ -60,6 +60,8 @@ export default function DashboardLayout({
   
   // States
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -190,14 +192,18 @@ export default function DashboardLayout({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Dropdowns click-away listener
+  // Dropdowns close when clicking outside their own container. Uses refs +
+  // mousedown (not a bubble-phase document click with stopPropagation, which
+  // is fragile with React's delegated events and could stop the dropdown from
+  // opening at all).
   useEffect(() => {
-    const handleDocumentClick = () => {
-      setNotificationsOpen(false);
-      setProfileMenuOpen(false);
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (notifRef.current && !notifRef.current.contains(t)) setNotificationsOpen(false);
+      if (profileRef.current && !profileRef.current.contains(t)) setProfileMenuOpen(false);
     };
-    document.addEventListener('click', handleDocumentClick);
-    return () => document.removeEventListener('click', handleDocumentClick);
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
   if (loading || !isLoggedIn) {
@@ -459,9 +465,10 @@ export default function DashboardLayout({
             </div>
 
             {/* Notification trigger */}
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <button 
-                onClick={() => setNotificationsOpen(!notificationsOpen)}
+            <div className="relative" ref={notifRef}>
+              <button
+                type="button"
+                onClick={() => { setNotificationsOpen((v) => !v); setProfileMenuOpen(false); }}
                 className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500 relative cursor-pointer"
               >
                 <Bell className="h-4.5 w-4.5" />
@@ -512,9 +519,10 @@ export default function DashboardLayout({
             </div>
 
             {/* Admin actions dropdown */}
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <button 
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+            <div className="relative" ref={profileRef}>
+              <button
+                type="button"
+                onClick={() => { setProfileMenuOpen((v) => !v); setNotificationsOpen(false); }}
                 className="flex items-center gap-2 hover:bg-slate-50 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 <div className="h-7 w-7 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center font-bold text-xs text-slate-700">
