@@ -9,15 +9,23 @@ import {
   TrendingDown,
   ShieldCheck,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  BarChart3,
+  CheckCircle2,
+  XCircle,
+  Mail,
+  KeyRound
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { PageBanner } from '@/components/dashboard/page-banner';
 import { api } from '@/lib/api';
+import { recipientDisplayStatus, recipientEnvironment } from '@/lib/tracking';
 import { useSession } from '@/hooks/use-session';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -47,14 +55,22 @@ function timeAgo(isoTimestamp: string): string {
 }
 
 export default function OverviewPage() {
-  const { username, displayName } = useSession();
+  const { username, displayName, loginTenant } = useSession();
   const [greeting, setGreeting] = useState('Good morning');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [departmentRates, setDepartmentRates] = useState<{ department: string; rate: number; total_recipients: number }[]>([]);
   const [recentEvents, setRecentEvents] = useState<{ name: string; campaign: string; status: string; timestamp: string }[]>([]);
   const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [emailConfigured, setEmailConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Report popup + delete confirm for the Active Simulations table
+  const [reportCampaign, setReportCampaign] = useState<any | null>(null);
+  const [reportRecipients, setReportRecipients] = useState<any[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -70,6 +86,7 @@ export default function OverviewPage() {
       setDepartmentRates(analytics.department_rates);
       setRecentEvents(analytics.recent_events);
       setSsoEnabled(settings.sso.enabled);
+      setEmailConfigured((settings.emailConfigs || []).length > 0);
     } catch (err: any) {
       toast.error('Failed to fetch dashboard metrics: ' + err.message);
     } finally {
@@ -88,11 +105,41 @@ export default function OverviewPage() {
   }, []);
 
   const friendlyName = (() => {
-    if (displayName && displayName !== username) return displayName.split(' ')[0];
+    if (displayName && displayName !== username) return displayName;
+    if (loginTenant === 'default') return 'Super Admin';
     const prefix = (username || '').split('@')[0].split('+')[0];
     if (!prefix) return '';
     return prefix.charAt(0).toUpperCase() + prefix.slice(1);
   })();
+
+  const openReport = async (camp: any) => {
+    setReportCampaign(camp);
+    setReportLoading(true);
+    try {
+      const recipients = await api.recipients.list(camp._id || camp.id);
+      setReportRecipients(recipients);
+    } catch (err: any) {
+      toast.error('Failed to load report: ' + err.message);
+      setReportRecipients([]);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      await api.campaigns.delete(deleteId);
+      toast.success('Simulation deleted.');
+      setDeleteId(null);
+      loadData();
+    } catch (err: any) {
+      toast.error('Failed to delete: ' + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Compute analytics from active tenant's campaigns
   const totalSent = campaigns.reduce((acc, c) => acc + (c.sentCount || c.sent_count || 0), 0);
@@ -108,33 +155,70 @@ export default function OverviewPage() {
     return risk === 'high';
   }).length;
 
+  // Security Health Check: a small readiness checklist. `neutralOnFail` items
+  // are informational (grey when not yet done) rather than a warning.
+  const healthChecks: { ok: boolean; label: string; detail: string; icon: any; neutralOnFail?: boolean }[] = [
+    {
+      ok: emailConfigured,
+      label: 'Email sending configured',
+      detail: emailConfigured
+        ? 'A sender profile is set up and ready to deliver simulations.'
+        : 'No SMTP / SendGrid profile yet — add one in Tenant Settings to send.',
+      icon: Mail,
+    },
+    {
+      ok: ssoEnabled,
+      label: 'Admin single sign-on',
+      detail: ssoEnabled
+        ? 'Microsoft Entra SSO is active for administrator login.'
+        : 'SSO is not configured — admins sign in with email and password.',
+      icon: KeyRound,
+      neutralOnFail: true,
+    },
+    {
+      ok: totalSent > 0,
+      label: 'Simulations launched',
+      detail: totalSent > 0
+        ? `${totalSent} simulated email(s) delivered so far.`
+        : 'No simulations sent yet — launch one from Campaign Manager.',
+      icon: Send,
+      neutralOnFail: true,
+    },
+    {
+      ok: highRiskEmployees === 0,
+      label: 'No high-risk employees',
+      detail: highRiskEmployees === 0
+        ? 'No employees have repeatedly clicked simulated links.'
+        : `${highRiskEmployees} employee(s) clicked links in 2+ simulations — enroll them in training.`,
+      icon: AlertTriangle,
+    },
+  ];
+  const healthyCount = healthChecks.filter(c => c.ok).length;
+  const healthPct = Math.round((healthyCount / healthChecks.length) * 100);
+
   return (
     <div className="space-y-6">
       {/* Page header */}
       <PageBanner
-        title="Overview Dashboard"
-        description="Real-time simulation metrics, compliance scores, and human risk telemetry."
+        title="Dashboard"
+        description={
+          <>
+            <p>Track your phishing simulations, open and click rates, and workforce risk — all in one place.</p>
+            <p>Launch a new simulation, review who clicked, and follow up with the employees who need training.</p>
+            <p className="text-white/60">Tip: use the cards below for a quick pulse, and open any active simulation to see its full report.</p>
+          </>
+        }
         eyebrow={
           friendlyName ? (
             <p className="text-sm font-semibold text-rose-200 mb-1">{greeting}, {friendlyName}</p>
           ) : undefined
         }
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loadData}
-              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
-            >
-              Refresh telemetry
+          <Link href="/dashboard/campaigns">
+            <Button size="sm" className="bg-white text-primary hover:bg-white/90">
+              New Simulation
             </Button>
-            <Link href="/dashboard/campaigns">
-              <Button size="sm" className="bg-white text-primary hover:bg-white/90">
-                New Simulation
-              </Button>
-            </Link>
-          </>
+          </Link>
         }
       />
 
@@ -285,6 +369,7 @@ export default function OverviewPage() {
                       <TableHead>Opened</TableHead>
                       <TableHead>Clicked</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -295,7 +380,11 @@ export default function OverviewPage() {
                       const clicked = camp.clickedCount || camp.clicked_count || 0;
 
                       return (
-                        <TableRow key={idVal}>
+                        <TableRow
+                          key={idVal}
+                          onClick={() => openReport(camp)}
+                          className="cursor-pointer hover:bg-slate-50"
+                        >
                           <TableCell className="font-semibold">{camp.name}</TableCell>
                           <TableCell>{sent}</TableCell>
                           <TableCell>{opened}</TableCell>
@@ -303,12 +392,34 @@ export default function OverviewPage() {
                           <TableCell>
                             <Badge variant="warning" className="animate-pulse">Active</Badge>
                           </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-primary"
+                                title="View report"
+                                onClick={() => openReport(camp)}
+                              >
+                                <BarChart3 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-destructive"
+                                title="Delete simulation"
+                                onClick={() => setDeleteId(idVal)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
                     {activeCampaigns.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-6 text-slate-400 text-xs">
+                        <TableCell colSpan={6} className="text-center py-6 text-slate-400 text-xs">
                           No active phishing campaigns running.
                         </TableCell>
                       </TableRow>
@@ -323,28 +434,56 @@ export default function OverviewPage() {
         {/* Right: Security Health Check & Risk Indicators */}
         <div className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Security Health Check</CardTitle>
-              <CardDescription>Compliance verification checklist</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {ssoEnabled && (
-                <div className="flex items-start gap-3 p-3 bg-green-50/50 border border-green-200 rounded-lg">
-                  <ShieldCheck className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-xs text-green-900">Microsoft Entra OIDC Active</h4>
-                    <p className="text-[10px] text-green-700 mt-0.5">SSO single sign-on is fully active for administration login.</p>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Security Health Check</CardTitle>
+                  <CardDescription>Your program readiness at a glance</CardDescription>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-slate-900 leading-none">{healthyCount}<span className="text-slate-400 text-sm font-semibold">/{healthChecks.length}</span></div>
+                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">healthy</div>
+                  </div>
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                    healthPct === 100 ? 'bg-green-100 text-green-600' : healthPct >= 50 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                  }`}>
+                    <ShieldCheck className="h-5 w-5" />
                   </div>
                 </div>
-              )}
-
-              <div className="flex items-start gap-3 p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-xs text-amber-900">High Risk Employees ({highRiskEmployees})</h4>
-                  <p className="text-[10px] text-amber-700 mt-0.5">Employees have clicked on links in 2 or more simulations.</p>
-                </div>
               </div>
+              <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${healthPct === 100 ? 'bg-green-500' : healthPct >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                  style={{ width: `${healthPct}%` }}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              {healthChecks.map((c, i) => {
+                const tone = c.ok ? 'green' : c.neutralOnFail ? 'slate' : 'amber';
+                const Icon = c.ok ? CheckCircle2 : c.neutralOnFail ? c.icon : AlertTriangle;
+                const toneClass = tone === 'green'
+                  ? 'bg-green-50/60 border-green-200'
+                  : tone === 'amber'
+                    ? 'bg-amber-50/60 border-amber-200'
+                    : 'bg-slate-50 border-slate-200';
+                const iconClass = tone === 'green' ? 'text-green-600' : tone === 'amber' ? 'text-amber-600' : 'text-slate-400';
+                const titleClass = tone === 'green' ? 'text-green-900' : tone === 'amber' ? 'text-amber-900' : 'text-slate-700';
+                const descClass = tone === 'green' ? 'text-green-700' : tone === 'amber' ? 'text-amber-700' : 'text-slate-500';
+                return (
+                  <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${toneClass}`}>
+                    <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconClass}`} />
+                    <div className="min-w-0">
+                      <h4 className={`font-semibold text-xs ${titleClass}`}>{c.label}</h4>
+                      <p className={`text-[10px] mt-0.5 leading-snug ${descClass}`}>{c.detail}</p>
+                    </div>
+                    {!c.ok && !c.neutralOnFail && (
+                      <XCircle className="h-4 w-4 text-amber-400 shrink-0 ml-auto" />
+                    )}
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 
@@ -379,6 +518,107 @@ export default function OverviewPage() {
         </div>
 
       </div>
+
+      {/* Campaign report popup (from Active Simulations) */}
+      <Dialog open={!!reportCampaign} onOpenChange={(open) => !open && setReportCampaign(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{reportCampaign?.name}</DialogTitle>
+            <DialogDescription>{reportCampaign?.subject || 'Simulation report'}</DialogDescription>
+          </DialogHeader>
+          {reportCampaign && (() => {
+            const sent = reportCampaign.sentCount || reportCampaign.sent_count || 0;
+            const clicked = reportCampaign.clickedCount || reportCampaign.clicked_count || 0;
+            const opened = Math.max(reportCampaign.openedCount || reportCampaign.opened_count || 0, clicked);
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-xl font-bold text-slate-900">{sent}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Sent</div>
+                  </div>
+                  <div className="p-3 bg-amber-50/50 rounded-lg border border-amber-100">
+                    <div className="text-xl font-bold text-amber-600">{opened}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Opened</div>
+                  </div>
+                  <div className="p-3 bg-red-50/50 rounded-lg border border-red-100">
+                    <div className="text-xl font-bold text-destructive">{clicked}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">Clicked</div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 mb-2">Recipient breakdown</h4>
+                  <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50 [&>th]:h-9 [&>th]:text-slate-700 [&>th]:font-semibold">
+                          <TableHead>Recipient</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Clicked</TableHead>
+                          <TableHead>Device</TableHead>
+                          <TableHead>Location</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportLoading ? (
+                          <TableRow><TableCell colSpan={5} className="text-center py-6 text-slate-400 text-xs">Loading recipients...</TableCell></TableRow>
+                        ) : reportRecipients.length === 0 ? (
+                          <TableRow><TableCell colSpan={5} className="text-center py-6 text-slate-400 text-xs">No recipients on this campaign.</TableCell></TableRow>
+                        ) : (
+                          reportRecipients.map((r: any, idx: number) => {
+                            const status = recipientDisplayStatus(r);
+                            const env = recipientEnvironment(r);
+                            const g = env.location.geo;
+                            const place = g ? [g.city, g.region, g.countryCode || g.country].filter(Boolean).join(', ') : '-';
+                            return (
+                              <TableRow key={r._id || r.id || idx}>
+                                <TableCell>
+                                  <div className="font-semibold text-slate-800 text-xs">{r.name || r.email}</div>
+                                  {r.name && r.name !== r.email && <div className="text-[10px] text-slate-500">{r.email}</div>}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={status === 'clicked' || status === 'failed' ? 'danger' : status === 'opened' ? 'warning' : 'secondary'}>{status}</Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-slate-700">{r.clicked_at ? new Date(r.clicked_at).toLocaleString() : '-'}</TableCell>
+                                <TableCell className="text-xs text-slate-700">{[env.device, env.os, env.browser].filter(Boolean).join(' · ') || '-'}</TableCell>
+                                <TableCell className="text-xs text-slate-700">{place}</TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Link href="/dashboard/campaigns">
+              <Button variant="outline" size="sm">Open in Campaign Manager</Button>
+            </Link>
+            <Button size="sm" onClick={() => setReportCampaign(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" /> Delete simulation
+            </DialogTitle>
+            <DialogDescription>
+              This permanently deletes the campaign and all of its tracking events. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" size="sm" onClick={confirmDelete} loading={deleting}>Delete Permanently</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
