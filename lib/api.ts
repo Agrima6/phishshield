@@ -351,6 +351,12 @@ export const api = {
     getStats: async (id: string) => {
       return fetcher<any>(`/api/phish/campaigns/${id}`);
     },
+    update: async (id: string, data: { name?: string; subject?: string; body_html?: string; sender_name?: string; redirect_url?: string; training_url?: string; header_image_url?: string }) => {
+      return fetcher<any>(`/api/phish/campaigns/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
     send: async (id: string, emailConfigId?: string) => {
       return fetcher<any>(`/api/phish/campaigns/${id}/send`, {
         method: 'POST',

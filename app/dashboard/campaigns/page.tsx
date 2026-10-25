@@ -19,7 +19,10 @@ import {
   BarChart3,
   Pencil,
   Download,
-  FileText
+  FileText,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
@@ -114,6 +117,10 @@ export default function CampaignsPage() {
 
   const [previewCampaign, setPreviewCampaign] = useState<any | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  const [editDraftId, setEditDraftId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState({ name: '', subject: '', senderName: '', redirectUrl: '', trainingUrl: '', bodyHtml: '' });
+  const [editDraftSaving, setEditDraftSaving] = useState(false);
 
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
@@ -247,6 +254,52 @@ export default function CampaignsPage() {
       setReportRecipients([]);
     } finally {
       setReportLoading(false);
+    }
+  };
+
+  const openDraftEdit = async (camp: any) => {
+    const idVal = camp._id || camp.id;
+    setEditDraftId(idVal);
+    setEditDraft({
+      name: camp.name || '', subject: camp.subject || '', senderName: camp.senderName || camp.sender_name || '',
+      redirectUrl: '', trainingUrl: '', bodyHtml: '',
+    });
+    try {
+      const full = await api.campaigns.getStats(idVal);
+      setEditDraft({
+        name: full.name || camp.name || '',
+        subject: full.subject || camp.subject || '',
+        senderName: full.sender_name || camp.senderName || '',
+        redirectUrl: full.redirect_url || '',
+        trainingUrl: full.training_url || '',
+        bodyHtml: full.body_html || '',
+      });
+    } catch { /* keep what we have */ }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!editDraftId) return;
+    if (!editDraft.name.trim() || !editDraft.subject.trim()) {
+      toast.error('Name and subject are required.');
+      return;
+    }
+    setEditDraftSaving(true);
+    try {
+      await api.campaigns.update(editDraftId, {
+        name: editDraft.name,
+        subject: editDraft.subject,
+        sender_name: editDraft.senderName,
+        redirect_url: editDraft.redirectUrl,
+        training_url: editDraft.trainingUrl,
+        body_html: editDraft.bodyHtml,
+      });
+      toast.success('Draft updated.');
+      setEditDraftId(null);
+      loadData();
+    } catch (err: any) {
+      toast.error('Failed to save draft: ' + err.message);
+    } finally {
+      setEditDraftSaving(false);
     }
   };
 
@@ -683,6 +736,40 @@ export default function CampaignsPage() {
     return camp.status === filterStatus;
   });
 
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const toggleSort = (key: string) =>
+    setSort((cur) => (cur && cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  const sortVal = (camp: any, key: string): string | number => {
+    switch (key) {
+      case 'name': return (camp.name || '').toLowerCase();
+      case 'subject': return (camp.subject || '').toLowerCase();
+      case 'delivered': return camp.sentCount || camp.sent_count || 0;
+      case 'opened': return camp.openedCount || camp.opened_count || 0;
+      case 'clicked': return camp.clickedCount || camp.clicked_count || 0;
+      case 'status': return (camp.status || '').toLowerCase();
+      default: return 0;
+    }
+  };
+  const sortedCampaigns = sort
+    ? [...filteredCampaigns].sort((a, b) => {
+        const av = sortVal(a, sort.key), bv = sortVal(b, sort.key);
+        const cmp = typeof av === 'number' && typeof bv === 'number'
+          ? av - bv
+          : String(av).localeCompare(String(bv));
+        return sort.dir === 'asc' ? cmp : -cmp;
+      })
+    : filteredCampaigns;
+  const SortHead = ({ label, k, right }: { label: string; k: string; right?: boolean }) => (
+    <TableHead className={right ? 'text-right' : ''}>
+      <button onClick={() => toggleSort(k)} className={`inline-flex items-center gap-1 select-none hover:text-slate-900 ${right ? 'flex-row-reverse' : ''}`}>
+        {label}
+        {sort?.key === k
+          ? (sort.dir === 'asc' ? <ArrowUp className="h-3 w-3 text-emerald-600" /> : <ArrowDown className="h-3 w-3 text-destructive" />)
+          : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+      </button>
+    </TableHead>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -734,17 +821,18 @@ export default function CampaignsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Campaign Name</TableHead>
-                  <TableHead>Subject Line</TableHead>
-                  <TableHead>Delivered</TableHead>
-                  <TableHead>Opened</TableHead>
-                  <TableHead>Clicked</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="w-10">#</TableHead>
+                  <SortHead label="Campaign Name" k="name" />
+                  <SortHead label="Subject Line" k="subject" />
+                  <SortHead label="Delivered" k="delivered" />
+                  <SortHead label="Opened" k="opened" />
+                  <SortHead label="Clicked" k="clicked" />
+                  <SortHead label="Status" k="status" />
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCampaigns.map((camp) => {
+                {sortedCampaigns.map((camp, idx) => {
                   const idVal = camp._id || camp.id;
                   const sent = camp.sentCount || camp.sent_count || 0;
                   const opened = camp.openedCount || camp.opened_count || 0;
@@ -752,6 +840,7 @@ export default function CampaignsPage() {
 
                   return (
                     <TableRow key={idVal}>
+                      <TableCell className="text-slate-400 text-xs">{idx + 1}</TableCell>
                       <TableCell className="font-semibold text-slate-900">{camp.name}</TableCell>
                       <TableCell className="text-slate-650 max-w-[200px] truncate">{camp.subject}</TableCell>
                       <TableCell className="font-medium">{sent}</TableCell>
@@ -793,6 +882,15 @@ export default function CampaignsPage() {
                           </Button>
                           {camp.status === 'draft' && (
                             <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-primary"
+                                onClick={() => openDraftEdit(camp)}
+                                title="Edit draft"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="primary"
                                 size="sm"
@@ -1263,6 +1361,69 @@ export default function CampaignsPage() {
             <Button size="sm" onClick={handleConfirmSchedule} loading={scheduling} disabled={!scheduleDateTime}>
               Confirm Schedule
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Draft Edit Dialog */}
+      <Dialog open={!!editDraftId} onOpenChange={(open) => !open && setEditDraftId(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit draft campaign</DialogTitle>
+            <DialogDescription>Make changes to this draft before launching it. Changes are saved to the draft.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+            <div className="space-y-3 text-xs font-semibold">
+              <div>
+                <label className="block text-slate-700 mb-1">Campaign name</label>
+                <Input value={editDraft.name} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Subject</label>
+                <Input value={editDraft.subject} onChange={(e) => setEditDraft({ ...editDraft, subject: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Sender name</label>
+                <Input value={editDraft.senderName} onChange={(e) => setEditDraft({ ...editDraft, senderName: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Post-click redirect URL</label>
+                <Input value={editDraft.redirectUrl} onChange={(e) => setEditDraft({ ...editDraft, redirectUrl: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Training video / resource link</label>
+                <Input value={editDraft.trainingUrl} onChange={(e) => setEditDraft({ ...editDraft, trainingUrl: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-slate-700 mb-1">Email body (HTML)</label>
+                <textarea
+                  value={editDraft.bodyHtml}
+                  onChange={(e) => setEditDraft({ ...editDraft, bodyHtml: e.target.value })}
+                  spellCheck={false}
+                  className="w-full h-48 rounded-md border border-slate-200 p-2 font-mono text-[11px] leading-relaxed text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+            <div className="text-xs">
+              <label className="block text-slate-700 mb-1 font-semibold">Live preview</label>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 p-2 border-b border-slate-200 font-semibold space-y-0.5">
+                  <div className="truncate"><span className="text-slate-400">From:</span> {editDraft.senderName || 'IT Security Team'}</div>
+                  <div className="truncate"><span className="text-slate-400">Subject:</span> {editDraft.subject || '(no subject)'}</div>
+                </div>
+                <iframe
+                  title="Draft email preview"
+                  sandbox=""
+                  srcDoc={renderTemplatePreviewHtml({ body: editDraft.bodyHtml })}
+                  className="w-full bg-white"
+                  style={{ height: '320px', border: 'none' }}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setEditDraftId(null)}>Cancel</Button>
+            <Button size="sm" loading={editDraftSaving} onClick={handleSaveDraft}>Save changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
