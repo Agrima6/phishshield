@@ -200,6 +200,22 @@ export function CompanyDetailDialog({ company, detail, loading, onClose, onEdit 
                           </div>
                         )}
                       </div>
+
+                      {Array.isArray(detail.activity) && detail.activity.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Recent activity</div>
+                          <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-56 overflow-y-auto">
+                            {detail.activity.map((a: any, i: number) => (
+                              <div key={a._id || a.id || i} className="px-3 py-2.5 text-xs">
+                                <div className="text-slate-700 leading-snug">{a.message}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {a.actor ? `${a.actor} · ` : ''}{a.category ? `${a.category} · ` : ''}{formatDate(a.timestamp)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <p className="text-xs text-slate-400 py-8 text-center">Couldn&apos;t load details.</p>

@@ -28,6 +28,7 @@ interface RegistrationRow {
   primary_color: string;
   created_at: string;
   submitted_at: string | null;
+  name_updated_at?: string | null;
 }
 
 interface TenantRow {
@@ -383,6 +384,9 @@ export default function SuperAdminPage() {
                         <div>
                           <div className="font-semibold text-slate-900">{reg.company_name}</div>
                           <div className="text-[10px] text-slate-400">{reg.designation}</div>
+                          {reg.name_updated_at && (
+                            <div className="text-[10px] text-amber-600 font-medium">Renamed {fmtDate(reg.name_updated_at)}</div>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -561,7 +565,7 @@ export default function SuperAdminPage() {
               </TableHeader>
               <TableBody>
                 {tenantsList.map((t) => (
-                  <TableRow key={t.id}>
+                  <TableRow key={t.id} onClick={() => openView(t)} className="cursor-pointer hover:bg-slate-50">
                     <TableCell className="py-3">
                       <div className="font-semibold text-slate-900">{t.company_name}</div>
                       <div className="text-[10px] text-slate-400">{t.designation}</div>
@@ -587,7 +591,7 @@ export default function SuperAdminPage() {
                         <Send className="h-3 w-3 shrink-0" /> {t.campaign_count}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right py-3">
+                    <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => openView(t)}>
                           <Eye className="h-3.5 w-3.5" />
