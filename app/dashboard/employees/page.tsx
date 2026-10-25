@@ -49,6 +49,9 @@ export default function EmployeesPage() {
     department: 'Engineering',
     manager: ''
   });
+  const NAME_RE = /^[A-Za-z][A-Za-z .'-]*$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailValid = newEmp.email.trim().length === 0 || EMAIL_RE.test(newEmp.email.trim());
 
   const loadEmployees = async () => {
     setLoading(true);
@@ -68,8 +71,20 @@ export default function EmployeesPage() {
 
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEmp.name || !newEmp.email) {
+    if (!newEmp.name.trim() || !newEmp.email.trim()) {
       toast.error('Name and email are required fields.');
+      return;
+    }
+    if (!NAME_RE.test(newEmp.name.trim())) {
+      toast.error('Full name can only contain letters (no numbers).');
+      return;
+    }
+    if (!EMAIL_RE.test(newEmp.email.trim())) {
+      toast.error('Enter a valid corporate email address.');
+      return;
+    }
+    if (newEmp.manager.trim() && !NAME_RE.test(newEmp.manager.trim())) {
+      toast.error('Direct manager can only contain letters (no numbers).');
       return;
     }
 
@@ -289,23 +304,26 @@ export default function EmployeesPage() {
           <form onSubmit={handleAddEmployee} className="space-y-4 py-4 text-xs font-semibold">
             <div>
               <label className="block text-slate-700 mb-1">Full Name</label>
-              <Input 
+              <Input
                 required
-                placeholder="Aarav Sharma" 
+                maxLength={60}
+                placeholder="Please enter the employee's full name"
                 value={newEmp.name}
-                onChange={(e) => setNewEmp({ ...newEmp, name: e.target.value })}
+                onChange={(e) => setNewEmp({ ...newEmp, name: e.target.value.replace(/[0-9]/g, '') })}
               />
             </div>
 
             <div>
               <label className="block text-slate-700 mb-1">Corporate Email Address</label>
-              <Input 
+              <Input
                 required
                 type="email"
-                placeholder="aarav.sharma@company.com" 
+                placeholder="name@company.com"
+                error={!emailValid}
                 value={newEmp.email}
                 onChange={(e) => setNewEmp({ ...newEmp, email: e.target.value })}
               />
+              {!emailValid && <p className="text-[11px] text-destructive mt-1 font-normal">Enter a valid email address.</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -326,10 +344,11 @@ export default function EmployeesPage() {
 
               <div>
                 <label className="block text-slate-700 mb-1">Direct Manager</label>
-                <Input 
-                  placeholder="Manager name" 
+                <Input
+                  maxLength={60}
+                  placeholder="Please enter the manager's name"
                   value={newEmp.manager}
-                  onChange={(e) => setNewEmp({ ...newEmp, manager: e.target.value })}
+                  onChange={(e) => setNewEmp({ ...newEmp, manager: e.target.value.replace(/[0-9]/g, '') })}
                 />
               </div>
             </div>
