@@ -59,42 +59,56 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6 py-16">
       <div className="max-w-lg w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
-        <div className="flex items-center gap-2 text-primary mb-2">
-          <ShieldCheck className="h-5 w-5" />
-          <span className="text-xs font-semibold uppercase tracking-wide">Register your company</span>
+        <div className="mb-6">
+          <div className="inline-flex items-center gap-2 text-primary mb-3">
+            <span className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide">Register your company</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1.5">Get started with Workmate Shield</h1>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            We&apos;d be glad to welcome your organization. Please share a few details below, and we&apos;ll
+            send a secure setup link to your work email so you can complete onboarding in just a few minutes.
+          </p>
         </div>
-        <h1 className="text-xl font-bold text-slate-900 mb-1">Get started with Workmate Shield</h1>
-        <p className="text-sm text-slate-500 mb-6">Tell us a bit about your company - we&apos;ll email you a link to finish setup.</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Company name</label>
-            <Input placeholder="Sharma Enterprises Pvt Ltd" error={!!errors.company_name} {...register('company_name')} />
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Company name <span className="text-destructive">*</span></label>
+            <Input placeholder="Please enter your company name" error={!!errors.company_name} {...register('company_name')} />
             {errors.company_name && <p className="text-xs text-destructive mt-1">{errors.company_name.message}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Contact person</label>
-            <Input placeholder="Aarav Sharma" error={!!errors.contact_name} {...register('contact_name')} />
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Contact person <span className="text-destructive">*</span></label>
+            <Input placeholder="Please enter your full name" error={!!errors.contact_name} {...register('contact_name')} />
             {errors.contact_name && <p className="text-xs text-destructive mt-1">{errors.contact_name.message}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Work email</label>
-            <Input type="email" placeholder="aarav@sharma.com" error={!!errors.contact_email} {...register('contact_email')} />
-            {errors.contact_email && <p className="text-xs text-destructive mt-1">{errors.contact_email.message}</p>}
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Work email <span className="text-destructive">*</span></label>
+            <Input type="email" placeholder="abc@company.com" error={!!errors.contact_email} {...register('contact_email')} />
+            {errors.contact_email ? (
+              <p className="text-xs text-destructive mt-1">{errors.contact_email.message}</p>
+            ) : (
+              <p className="text-[11px] text-slate-400 mt-1">We&apos;ll send your secure setup link to this address.</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile number</label>
-              <Input placeholder="+91 98765 43210" {...register('contact_mobile')} />
+              <Input placeholder="Please enter your mobile number" {...register('contact_mobile')} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Designation</label>
-              <Input placeholder="IT Director" {...register('designation')} />
+              <Input placeholder="Please enter your designation" {...register('designation')} />
             </div>
           </div>
           <Button type="submit" className="w-full" loading={loading}>
             Submit registration
           </Button>
+          <p className="text-[11px] text-center text-slate-400">
+            No credit card required. Your details stay private and are used only to set up your account.
+          </p>
         </form>
 
         <p className="text-xs text-center text-slate-500 mt-6">
