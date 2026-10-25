@@ -5,8 +5,11 @@ import { useParams } from 'next/navigation';
 import { CheckCircle2, Upload, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+
+const EMPLOYEE_RANGES = ['1-50', '51-100', '101-200', '201-300', '301-500', '501-750', '751-1000', '1000+'];
 
 // Standard 15-character Indian GSTIN: 2 state digits, 5 PAN letters, 4 digits,
 // 1 PAN letter, 1 entity digit/letter, fixed 'Z', 1 checksum char.
@@ -27,6 +30,7 @@ export default function OnboardingPage() {
   const [gstNumber, setGstNumber] = useState('');
   const [employeeCount, setEmployeeCount] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#7a1220');
+  const [secondaryColor, setSecondaryColor] = useState('#1f2937');
   const [logoUrl, setLogoUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -77,6 +81,7 @@ export default function OnboardingPage() {
         employee_count: employeeCount,
         logo_url: logoUrl,
         primary_color: primaryColor,
+        secondary_color: secondaryColor,
       });
       setPhase('submitted');
     } catch (err: any) {
@@ -172,17 +177,16 @@ export default function OnboardingPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Company registered address <span className="text-destructive">*</span>
+                  Company address <span className="text-destructive">*</span>
                 </label>
-                <Input
-                  placeholder="Registered office address as on your incorporation / GST certificate"
+                <textarea
+                  placeholder="Enter your company address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
+                  rows={3}
                   required
+                  className="w-full rounded-md border border-slate-200 p-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Please enter your company&apos;s official registered address — not a branch or personal address.
-                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -209,13 +213,12 @@ export default function OnboardingPage() {
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Number of employees <span className="text-slate-400 font-normal">(optional)</span>
                   </label>
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="e.g. 50"
-                    value={employeeCount}
-                    onChange={(e) => setEmployeeCount(e.target.value)}
-                  />
+                  <Select value={employeeCount} onChange={(e) => setEmployeeCount(e.target.value)}>
+                    <option value="">Select a range</option>
+                    {EMPLOYEE_RANGES.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </Select>
                 </div>
               </div>
 
@@ -237,24 +240,39 @@ export default function OnboardingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Brand color <span className="text-slate-400 font-normal">(optional)</span>
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="h-10 w-14 rounded-md border border-slate-200 cursor-pointer"
-                  />
-                  <span className="text-sm text-slate-500">{primaryColor}</span>
+                <h3 className="text-xs font-bold text-slate-800 mb-2">Theme</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Primary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={primaryColor}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        className="h-10 w-14 rounded-md border border-slate-200 cursor-pointer"
+                      />
+                      <Input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="font-mono text-xs" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Secondary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={secondaryColor}
+                        onChange={(e) => setSecondaryColor(e.target.value)}
+                        className="h-10 w-14 rounded-md border border-slate-200 cursor-pointer"
+                      />
+                      <Input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="font-mono text-xs" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           <Button type="submit" className="w-full" loading={submitting}>
-            Submit for review
+            Submit
           </Button>
         </form>
       </div>

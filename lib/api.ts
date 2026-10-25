@@ -199,7 +199,7 @@ export const api = {
     },
     submitOnboarding: async (
       token: string,
-      data: { address: string; gst_number?: string; employee_count?: string; logo_url?: string; primary_color?: string }
+      data: { address: string; gst_number?: string; employee_count?: string; logo_url?: string; primary_color?: string; secondary_color?: string }
     ) => {
       return fetcher<{ status: string }>(`/api/public/onboarding/${token}`, {
         method: 'POST',
