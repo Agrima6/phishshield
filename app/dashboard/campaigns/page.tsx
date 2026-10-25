@@ -93,6 +93,7 @@ export default function CampaignsPage() {
     templateId: '',
     emailConfigId: '',
     redirectUrl: '',
+    trainingUrl: '',
     // Per-campaign override of the chosen template's email HTML. Empty means
     // "use the template body as-is"; editing it in the wizard customises this
     // one send without touching the saved template.
@@ -169,6 +170,7 @@ export default function CampaignsPage() {
         body_html: bodyHtml,
         sender_name: newCampaign.senderName,
         redirect_url: newCampaign.redirectUrl || defaultRedirectForTemplate(chosenTemplate || ''),
+        training_url: newCampaign.trainingUrl || undefined,
         email_config_id: newCampaign.emailConfigId || undefined,
         header_image_url: headerImageUrl,
       });
@@ -188,6 +190,7 @@ export default function CampaignsPage() {
         templateId: '',
         emailConfigId: '',
         redirectUrl: '',
+        trainingUrl: '',
         bodyHtml: ''
       });
       loadData();
@@ -1027,6 +1030,19 @@ export default function CampaignsPage() {
                 <p className="text-[10px] text-slate-400 font-normal mt-1.5 leading-relaxed">
                   Where the &quot;Sign in&quot; button on the awareness page sends the recipient afterward.
                   Pre-filled to match the selected template, but you can point it anywhere.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Training video / resource link <span className="text-slate-400 font-normal">(optional)</span></label>
+                <Input
+                  placeholder="https://youtube.com/watch?v=…  or any training page URL"
+                  value={newCampaign.trainingUrl}
+                  onChange={(e) => setNewCampaign({ ...newCampaign, trainingUrl: e.target.value })}
+                />
+                <p className="text-[10px] text-slate-400 font-normal mt-1.5 leading-relaxed">
+                  Shown on the &quot;you&apos;ve been phished&quot; awareness page after the recipient submits the form.
+                  A YouTube link embeds as a video; any other link shows as a button.
                 </p>
               </div>
             </div>

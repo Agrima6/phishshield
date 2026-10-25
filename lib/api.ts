@@ -328,6 +328,9 @@ export const api = {
       body_html: string;
       sender_name: string;
       redirect_url?: string;
+      // Optional training resource (YouTube/web link) shown on the awareness
+      // page after the recipient "signs in".
+      training_url?: string;
       email_config_id?: string;
       // The selected template's header image - the backend inserts it into
       // body_html server-side (once, only if the body doesn't already have
