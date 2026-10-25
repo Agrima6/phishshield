@@ -112,6 +112,9 @@ export default function CampaignsPage() {
   const [reportRecipients, setReportRecipients] = useState<any[]>([]);
   const [reportLoading, setReportLoading] = useState(false);
 
+  const [previewCampaign, setPreviewCampaign] = useState<any | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [audienceDeptFilter, setAudienceDeptFilter] = useState<string>('all');
@@ -247,6 +250,19 @@ export default function CampaignsPage() {
     }
   };
 
+  const openPreview = async (camp: any) => {
+    setPreviewCampaign(camp);
+    setPreviewLoading(true);
+    try {
+      const full = await api.campaigns.getStats(camp._id || camp.id);
+      setPreviewCampaign({ ...camp, ...full });
+    } catch {
+      // fall back to the list row we already have
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   // Build a detailed CSV from the recipient data already loaded for the open
   // report and trigger a client-side download. Done in the browser (rather
   // than hitting the backend export endpoint) so the file always matches
@@ -347,8 +363,11 @@ export default function CampaignsPage() {
           const res = await fetch(url, { cache: 'no-store' });
           if (!res.ok) return null;
           const blob = await res.blob();
-          if (!/image\/(png|jpe?g|webp)/i.test(blob.type)) return null;
-          const fmt = /png/i.test(blob.type) ? 'PNG' : /webp/i.test(blob.type) ? 'WEBP' : 'JPEG';
+          // SVG can't be embedded by jsPDF; everything else we try as an image.
+          if (/svg/i.test(blob.type) || /\.svg($|\?)/i.test(url)) return null;
+          const fmt = /png/i.test(blob.type) || /\.png($|\?)/i.test(url) ? 'PNG'
+            : /webp/i.test(blob.type) || /\.webp($|\?)/i.test(url) ? 'WEBP'
+            : 'JPEG';
           const data: string = await new Promise((resolve, reject) => {
             const fr = new FileReader();
             fr.onload = () => resolve(fr.result as string);
@@ -358,11 +377,21 @@ export default function CampaignsPage() {
           return { data, fmt };
         } catch { return null; }
       };
-      // Try the tenant logo first, then fall back to the bundled app logo so
-      // the report always carries a mark (both are served same-origin).
+      // Resolve the tenant logo to a same-origin path first (an absolute
+      // api.* URL would be blocked by CORS when fetched for the PDF), then the
+      // absolute URL, then the bundled app logo as a last resort.
       const logoRaw: string = settings?.branding?.logoUrl || '';
+      const logoCandidates: string[] = [];
+      if (logoRaw) {
+        if (logoRaw.startsWith('/')) logoCandidates.push(logoRaw);
+        else {
+          try { logoCandidates.push(new URL(logoRaw).pathname); } catch { /* ignore */ }
+          logoCandidates.push(logoRaw);
+        }
+      }
+      logoCandidates.push('/workmate-shield-logo.png');
       let logo: { data: string; fmt: string } | null = null;
-      for (const cand of [logoRaw, '/workmate-shield-logo.png'].filter(Boolean)) {
+      for (const cand of logoCandidates) {
         logo = await loadImageDataUrl(cand);
         if (logo) break;
       }
@@ -392,7 +421,7 @@ export default function CampaignsPage() {
       doc.setFontSize(9);
       doc.text(doc.splitTextToSize(reportCampaign.subject || '', pageW - titleX - M - 130), titleX, 82);
       doc.setFontSize(8);
-      doc.text(`Generated ${new Date().toLocaleDateString()}`, pageW - M, 32, { align: 'right' });
+      doc.text(`Generated ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageW - M, 32, { align: 'right' });
       const bw = 112, bh = 24, bx = pageW - M - bw, by = 46;
       doc.setFillColor(...risk.col); doc.roundedRect(bx, by, bw, bh, 12, 12, 'F');
       doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
@@ -504,6 +533,29 @@ export default function CampaignsPage() {
         doc.setTextColor(...sub); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
         doc.text(lab, x + 16, y + 12);
       });
+      y += 30;
+
+      // "Why this matters" - sobering cyber-security facts to drive the point home.
+      const facts = [
+        'Over 90% of successful cyberattacks begin with a phishing email.',
+        'A single careless click can hand attackers passwords, customer records and funds.',
+        'The global average cost of a data breach is about $4.45 million (IBM, 2023).',
+        'Stolen credentials and phishing are the leading causes of breaches (Verizon DBIR).',
+        'Attackers can go from one click to full network access in under an hour.',
+        'Breaches can mean regulatory fines, legal action and lasting loss of customer trust.',
+      ];
+      const factLines = facts.map((f) => doc.splitTextToSize(`•  ${f}`, pageW - M * 2 - 24));
+      const flat = ([] as string[]).concat(...factLines);
+      const boxH = 30 + flat.length * 12 + 10;
+      if (y + boxH > pageH - 50) { doc.addPage(); y = 54; }
+      doc.setFillColor(254, 242, 242); doc.setDrawColor(254, 202, 202);
+      doc.roundedRect(M, y, pageW - M * 2, boxH, 8, 8, 'FD');
+      doc.setTextColor(...red); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text('Why this matters', M + 14, y + 20);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(120, 30, 30);
+      let fy = y + 36;
+      flat.forEach((ln: string) => { doc.text(ln, M + 14, fy); fy += 12; });
+      y += boxH;
 
       // Recipient detail on its own page
       doc.addPage();
@@ -725,6 +777,15 @@ export default function CampaignsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-primary"
+                            onClick={() => openPreview(camp)}
+                            title="Preview campaign"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-primary"
                             onClick={() => openCampaignReport(camp)}
                             title="View campaign report"
                           >
@@ -808,16 +869,6 @@ export default function CampaignsPage() {
                   placeholder="e.g. Q3 Office 365 Phishing Audit" 
                   value={newCampaign.name}
                   onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 mb-1">Email Subject Header</label>
-                <Input 
-                  required
-                  placeholder="Urgent action required: Corporate password security update" 
-                  value={newCampaign.subject}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, subject: e.target.value })}
                 />
               </div>
 
@@ -1212,6 +1263,56 @@ export default function CampaignsPage() {
             <Button size="sm" onClick={handleConfirmSchedule} loading={scheduling} disabled={!scheduleDateTime}>
               Confirm Schedule
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Campaign Preview Dialog */}
+      <Dialog open={!!previewCampaign} onOpenChange={(open) => !open && setPreviewCampaign(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{previewCampaign?.name}</DialogTitle>
+            <DialogDescription>What this simulation will send — email, sender and destinations.</DialogDescription>
+          </DialogHeader>
+          {previewCampaign && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                {([
+                  ['Status', previewCampaign.status],
+                  ['Subject line', previewCampaign.subject],
+                  ['Sender name', previewCampaign.sender_name || previewCampaign.senderName],
+                  ['Post-click redirect', previewCampaign.redirect_url || '—'],
+                  ['Training resource', previewCampaign.training_url || '—'],
+                  ['Delivered / Opened / Clicked', `${previewCampaign.sentCount || previewCampaign.total_sent || 0} / ${previewCampaign.openedCount || previewCampaign.total_opened || 0} / ${previewCampaign.clickedCount || previewCampaign.total_clicked || 0}`],
+                ] as [string, string][]).map(([label, val]) => (
+                  <div key={label}>
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
+                    <div className="text-slate-800 break-words">{val || '—'}</div>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Email preview</div>
+                {previewLoading ? (
+                  <p className="text-xs text-slate-400 py-6 text-center border border-slate-200 rounded-lg">Loading…</p>
+                ) : previewCampaign.body_html ? (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <iframe
+                      title="Campaign email preview"
+                      sandbox=""
+                      srcDoc={renderTemplatePreviewHtml({ body: previewCampaign.body_html })}
+                      className="w-full bg-white"
+                      style={{ height: '360px', border: 'none' }}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 py-6 text-center border border-slate-200 rounded-lg">No email body stored for this campaign.</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button size="sm" onClick={() => setPreviewCampaign(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
