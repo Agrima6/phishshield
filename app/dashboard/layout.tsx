@@ -95,19 +95,30 @@ export default function DashboardLayout({
     let active = true;
     const load = async () => {
       try {
-        const logs = await api.auditLogs.list();
+        const [logs, regs] = await Promise.all([
+          api.auditLogs.list().catch(() => [] as any[]),
+          loginTenant === 'default' ? api.adminRegistrations.list().catch(() => [] as any[]) : Promise.resolve([] as any[]),
+        ]);
         if (!active) return;
-        const mapped = (logs || []).map((l: any) => {
+        const auditItems = (logs || []).map((l: any) => {
           const ts = new Date(l.timestamp || 0).getTime() || 0;
           return { id: String(l._id || l.id || ts), text: l.message || 'Activity', time: relTime(l.timestamp), ts, category: l.category || '' };
-        }).sort((a, b) => b.ts - a.ts).slice(0, 25);
-        setNotifications(mapped);
+        });
+        // Super admin: surface companies that finished onboarding and need review.
+        const regItems = (regs || [])
+          .filter((r: any) => r.status === 'SUBMITTED')
+          .map((r: any) => {
+            const ts = new Date(r.submitted_at || r.created_at || 0).getTime() || 0;
+            return { id: `reg-${r.id}`, text: `${r.company_name} completed onboarding and is awaiting approval`, time: relTime(r.submitted_at || r.created_at), ts, category: 'REGISTRATION' };
+          });
+        const merged = [...regItems, ...auditItems].sort((a, b) => b.ts - a.ts).slice(0, 25);
+        setNotifications(merged);
       } catch { /* audit log may be forbidden for some roles - ignore */ }
     };
     load();
     const t = setInterval(load, 60000);
     return () => { active = false; clearInterval(t); };
-  }, []);
+  }, [loginTenant]);
 
   useEffect(() => {
     if (loginTenant === 'default') {

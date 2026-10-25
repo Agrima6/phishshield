@@ -64,6 +64,7 @@ export default function OverviewPage() {
   const [ssoEnabled, setSsoEnabled] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pendingRegs, setPendingRegs] = useState<any[]>([]);
 
   // Report popup + delete confirm for the Active Simulations table
   const [reportCampaign, setReportCampaign] = useState<any | null>(null);
@@ -97,6 +98,23 @@ export default function OverviewPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Super admin: surface companies awaiting approval right on the dashboard.
+  useEffect(() => {
+    if (loginTenant !== 'default') return;
+    let active = true;
+    const load = () => {
+      api.adminRegistrations.list()
+        .then((rows: any[]) => {
+          if (!active) return;
+          setPendingRegs((rows || []).filter((r) => r.status === 'SUBMITTED'));
+        })
+        .catch(() => { /* non-super-admin or unreachable - ignore */ });
+    };
+    load();
+    const t = setInterval(load, 60000);
+    return () => { active = false; clearInterval(t); };
+  }, [loginTenant]);
 
   // Computed client-side only (after mount) to avoid an SSR/client hydration
   // mismatch, since the greeting depends on the viewer's local clock.
@@ -298,6 +316,33 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Super admin: companies awaiting approval */}
+      {loginTenant === 'default' && pendingRegs.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {pendingRegs.length} {pendingRegs.length === 1 ? 'company is' : 'companies are'} awaiting your approval
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {pendingRegs.slice(0, 3).map((r) => r.company_name).join(', ')}
+                    {pendingRegs.length > 3 ? ` and ${pendingRegs.length - 3} more` : ''}.
+                  </p>
+                </div>
+              </div>
+              <Link href="/dashboard/super-admin" className="shrink-0">
+                <Button size="sm">Review now</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main split grid layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -73,6 +73,10 @@ export default function SuperAdminPage() {
   const [registrationsLoading, setRegistrationsLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [requestingId, setRequestingId] = useState<string | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<RegistrationRow | null>(null);
+  const [showChangeNotes, setShowChangeNotes] = useState(false);
+  const [changeNotes, setChangeNotes] = useState('');
 
   const [viewTarget, setViewTarget] = useState<TenantRow | null>(null);
   const [viewDetail, setViewDetail] = useState<any>(null);
@@ -126,6 +130,7 @@ export default function SuperAdminPage() {
       } else {
         toast.success(`${reg.company_name} approved. Login details sent to ${result.user_email}.`);
       }
+      setReviewTarget(null);
       loadRegistrations();
       loadTenants();
     } catch (err: any) {
@@ -141,12 +146,44 @@ export default function SuperAdminPage() {
     try {
       await api.adminRegistrations.reject(reg.id, reason);
       toast.success(`${reg.company_name} rejected.`);
+      setReviewTarget(null);
       loadRegistrations();
     } catch (err: any) {
       toast.error('Failed to reject: ' + err.message);
     } finally {
       setRejectingId(null);
     }
+  };
+
+  const openReview = (reg: RegistrationRow) => {
+    setReviewTarget(reg);
+    setShowChangeNotes(false);
+    setChangeNotes('');
+  };
+
+  const handleRequestChanges = async (reg: RegistrationRow) => {
+    if (!changeNotes.trim()) {
+      toast.error('Please describe what needs to change.');
+      return;
+    }
+    setRequestingId(reg.id);
+    try {
+      const res = await api.adminRegistrations.requestChanges(reg.id, changeNotes.trim());
+      if (res.email_warning) toast.warning(res.email_warning);
+      else toast.success(`Change request sent to ${reg.contact_email}.`);
+      setReviewTarget(null);
+      loadRegistrations();
+    } catch (err: any) {
+      toast.error('Failed to request changes: ' + err.message);
+    } finally {
+      setRequestingId(null);
+    }
+  };
+
+  const fmtDate = (s: string | null | undefined) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleString();
   };
 
   const handleOnboard = async (e: React.FormEvent) => {
@@ -282,7 +319,7 @@ export default function SuperAdminPage() {
               </TableHeader>
               <TableBody>
                 {registrations.map((reg) => (
-                  <TableRow key={reg.id}>
+                  <TableRow key={reg.id} onClick={() => openReview(reg)} className="cursor-pointer hover:bg-slate-50">
                     <TableCell className="py-3">
                       <div className="flex items-center gap-2">
                         {reg.logo_url && (
@@ -300,21 +337,19 @@ export default function SuperAdminPage() {
                       <div className="text-[10px] text-slate-400">{reg.contact_email}</div>
                     </TableCell>
                     <TableCell className="py-3">
-                      <Badge variant={reg.status === 'SUBMITTED' ? 'info' : reg.status === 'APPROVED' ? 'success' : reg.status === 'REJECTED' ? 'danger' : 'secondary'} className="text-[10px]">
-                        {reg.status.replace('_', ' ')}
+                      <Badge variant={reg.status === 'SUBMITTED' ? 'info' : reg.status === 'APPROVED' ? 'success' : reg.status === 'REJECTED' ? 'danger' : reg.status === 'CHANGES_REQUESTED' ? 'warning' : 'secondary'} className="text-[10px]">
+                        {reg.status.replace(/_/g, ' ')}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right py-3">
-                      {reg.status === 'SUBMITTED' && (
-                        <div className="flex justify-end gap-1.5">
-                          <Button size="sm" className="h-7 text-[11px]" loading={approvingId === reg.id} onClick={() => handleApprove(reg)}>
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 text-[11px] text-destructive hover:text-destructive" loading={rejectingId === reg.id} onClick={() => handleReject(reg)}>
-                            <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-                          </Button>
-                        </div>
-                      )}
+                    <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant={reg.status === 'SUBMITTED' ? 'primary' : 'outline'}
+                        className="h-7 text-[11px]"
+                        onClick={() => openReview(reg)}
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" /> {reg.status === 'SUBMITTED' ? 'Review' : 'View details'}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -583,6 +618,112 @@ export default function SuperAdminPage() {
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)}>Cancel</Button>
             <Button variant="destructive" size="sm" onClick={handleConfirmDelete} loading={deleting}>Delete Permanently</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Registration review dialog */}
+      <Dialog open={!!reviewTarget} onOpenChange={(open) => !open && setReviewTarget(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Review registration
+              {reviewTarget && (
+                <Badge variant={reviewTarget.status === 'SUBMITTED' ? 'info' : reviewTarget.status === 'APPROVED' ? 'success' : reviewTarget.status === 'REJECTED' ? 'danger' : reviewTarget.status === 'CHANGES_REQUESTED' ? 'warning' : 'secondary'} className="text-[10px]">
+                  {reviewTarget.status.replace(/_/g, ' ')}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Verify the applicant&apos;s details, then approve, request changes, or reject.
+            </DialogDescription>
+          </DialogHeader>
+
+          {reviewTarget && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                {reviewTarget.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={reviewTarget.logo_url} alt="" className="h-12 w-12 rounded-lg object-cover border border-slate-200" />
+                ) : (
+                  <div className="h-12 w-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-500">
+                    {reviewTarget.company_name.substring(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-900 truncate">{reviewTarget.company_name}</div>
+                  <div className="text-xs text-slate-500">{reviewTarget.designation || '—'}</div>
+                </div>
+                <div className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500 shrink-0">
+                  <span className="h-4 w-4 rounded border border-slate-200" style={{ background: reviewTarget.primary_color || '#7a1220' }} />
+                  {reviewTarget.primary_color || '#7a1220'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                {([
+                  ['Contact person', reviewTarget.contact_name],
+                  ['Work email', reviewTarget.contact_email],
+                  ['Mobile', reviewTarget.contact_mobile || '—'],
+                  ['Designation', reviewTarget.designation || '—'],
+                  ['GST / registration no.', reviewTarget.gst_number || '—'],
+                  ['Employees', reviewTarget.employee_count || '—'],
+                  ['Registered on', fmtDate(reviewTarget.created_at)],
+                  ['Submitted on', fmtDate(reviewTarget.submitted_at)],
+                ] as [string, string][]).map(([label, val]) => (
+                  <div key={label}>
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
+                    <div className="text-slate-800 break-words">{val}</div>
+                  </div>
+                ))}
+                <div className="sm:col-span-2">
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Company registered address</div>
+                  <div className="text-slate-800">{reviewTarget.address || '—'}</div>
+                </div>
+              </div>
+
+              {showChangeNotes && (
+                <div className="pt-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">What should the applicant change?</label>
+                  <textarea
+                    value={changeNotes}
+                    onChange={(e) => setChangeNotes(e.target.value)}
+                    rows={4}
+                    autoFocus
+                    placeholder="e.g. The registered address looks incomplete — please add the PIN code. The GSTIN does not match the company name."
+                    className="w-full rounded-md border border-slate-200 p-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">We&apos;ll email these notes and a fresh onboarding link to {reviewTarget.contact_email}.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            {reviewTarget && reviewTarget.status === 'SUBMITTED' ? (
+              !showChangeNotes ? (
+                <>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive sm:mr-auto" loading={rejectingId === reviewTarget.id} onClick={() => handleReject(reviewTarget)}>
+                    <XCircle className="h-4 w-4 mr-1" /> Reject
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowChangeNotes(true)}>
+                    <Pencil className="h-4 w-4 mr-1" /> Request changes
+                  </Button>
+                  <Button size="sm" loading={approvingId === reviewTarget.id} onClick={() => handleApprove(reviewTarget)}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" size="sm" className="sm:mr-auto" onClick={() => setShowChangeNotes(false)}>Back</Button>
+                  <Button size="sm" loading={requestingId === reviewTarget.id} onClick={() => handleRequestChanges(reviewTarget)}>
+                    <Mail className="h-4 w-4 mr-1" /> Send change request
+                  </Button>
+                </>
+              )
+            ) : (
+              <Button size="sm" onClick={() => setReviewTarget(null)}>Close</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -236,6 +236,12 @@ export const api = {
         body: JSON.stringify({ reason: reason || '' }),
       });
     },
+    requestChanges: async (id: string, notes: string) => {
+      return fetcher<{ registration: any; email_warning?: string }>(
+        `/api/admin/registrations/${id}/request-changes`,
+        { method: 'POST', body: JSON.stringify({ notes }) }
+      );
+    },
   },
 
   team: {
