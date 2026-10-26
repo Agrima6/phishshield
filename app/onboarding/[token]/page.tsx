@@ -16,6 +16,11 @@ const EMPLOYEE_RANGES = ['1-50', '51-100', '101-200', '201-300', '301-500', '501
 const GST_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const isGstValid = (v: string) => GST_RE.test(v.trim().toUpperCase());
 
+// Mirrors the backend's _ADDRESS_RE: letters, digits, spaces, and the
+// punctuation real addresses use (, . - / ' # &) - no ! @ or other symbols.
+const ADDRESS_RE = /^[A-Za-z0-9\s,.\-/'#&]{5,300}$/;
+const isAddressValid = (v: string) => ADDRESS_RE.test(v.trim());
+
 export default function OnboardingPage() {
   const params = useParams();
   const token = params.token as string;
@@ -67,6 +72,10 @@ export default function OnboardingPage() {
     e.preventDefault();
     if (!address.trim()) {
       toast.error('Company registered address is required.');
+      return;
+    }
+    if (!isAddressValid(address)) {
+      toast.error('Address can only contain letters, numbers, spaces, and , . - / # & (no ! @ or other symbols).');
       return;
     }
     if (gstNumber.trim() && !isGstValid(gstNumber)) {
