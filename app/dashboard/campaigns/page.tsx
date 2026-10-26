@@ -220,7 +220,17 @@ export default function CampaignsPage() {
   const handleLaunchCampaign = async (id: string, name: string) => {
     setLaunchingId(id);
     try {
-      await api.campaigns.send(id);
+      const res = await api.campaigns.send(id);
+      if (res?.state !== 'queued') {
+        // 200 with no job started - e.g. no recipients were ever added, or
+        // every recipient on this campaign already sent. Nothing is running,
+        // so say that plainly instead of claiming it was queued/sent (the
+        // previous unconditional success toast made the Deploy button look
+        // broken: it reported "queued"/"finished sending" even though the
+        // backend never started a job).
+        toast.error(res?.message || 'Nothing to send for this campaign.');
+        return;
+      }
       toast.success(`Phishing simulation "${name}" queued — sending now.`);
 
       // The send happens in a background job on the server; the campaign's
