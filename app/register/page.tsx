@@ -33,8 +33,8 @@ const schema = zod.object({
     .trim()
     .optional()
     .refine(
-      (v) => !v || /^6\d{9}$/.test(v),
-      'Mobile number must start with 6 and be 10 digits.',
+      (v) => !v || /^\d{10}$/.test(v),
+      'Mobile number must be 10 digits.',
     ),
   designation: zod
     .string()

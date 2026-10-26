@@ -280,14 +280,14 @@ export default function ReportsPage() {
               onClick={() => handleExportReport('csv')}
               className="flex items-center gap-1 bg-white/10 text-white border-white/20 hover:bg-white/20"
             >
-              <FileSpreadsheet className="h-4 w-4" /> Download CSV
+              <FileSpreadsheet className="h-4 w-4" /> CSV
             </Button>
             <Button
               size="sm"
               onClick={() => handleExportReport('pdf')}
               className="flex items-center gap-1 bg-white text-primary hover:bg-white/90"
             >
-              <FileText className="h-4 w-4" /> Download PDF
+              <FileText className="h-4 w-4" /> PDF
             </Button>
           </>
         }

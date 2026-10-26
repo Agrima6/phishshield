@@ -1559,7 +1559,7 @@ export default function CampaignsPage() {
                         disabled={reportLoading || reportRecipients.length === 0}
                         title="Download a full PDF report"
                       >
-                        <FileText className="h-3.5 w-3.5" /> Download PDF
+                        <FileText className="h-3.5 w-3.5" /> PDF
                       </Button>
                       <Button
                         variant="outline"
@@ -1569,7 +1569,7 @@ export default function CampaignsPage() {
                         disabled={reportLoading || reportRecipients.length === 0}
                         title="Download the raw data as CSV"
                       >
-                        <Download className="h-3.5 w-3.5" /> Download CSV
+                        <Download className="h-3.5 w-3.5" /> CSV
                       </Button>
                     </div>
                   </div>
