@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { api, API_BASE } from '@/lib/api';
 import { renderTemplateEmailHtml } from '@/lib/templateEmail';
+import { VisualTemplateEditor } from '@/components/templates/VisualTemplateEditor';
 import { PhishingTemplate } from '@/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,10 @@ export default function TemplatesPage() {
 
   // AI Occasion Generator State
   const [generating, setGenerating] = useState(false);
+  // Bumped whenever newTemp.body is replaced by something other than
+  // the user's own typing (AI generation, opening the dialog fresh) - the
+  // visual editor is uncontrolled, so it only re-reads `value` when this changes.
+  const [createEditorKey, setCreateEditorKey] = useState(0);
   const [aiOccasion, setAiOccasion] = useState('Diwali');
 
   // New Template Form
@@ -142,6 +147,7 @@ export default function TemplatesPage() {
         thumbnail: result.thumbnail || '🎨'
       });
       setImagePreview('');
+      setCreateEditorKey((k) => k + 1);
       toast.success(`Generated template options for ${aiOccasion} successfully.`);
     } catch (err: any) {
       toast.error(err.message || 'AI template generation failed.');
@@ -596,13 +602,10 @@ export default function TemplatesPage() {
 
             <div>
               <label className="block text-slate-700 mb-1">Email Body Content</label>
-              <textarea
-                required
-                rows={5}
-                className="w-full border border-slate-200 bg-background rounded-md p-2 outline-hidden font-normal text-slate-800"
-                placeholder="Write your email body copy here. Direct links will automatically be attached to primary action buttons."
+              <VisualTemplateEditor
                 value={editTemp.body}
-                onChange={(e) => setEditTemp({ ...editTemp, body: e.target.value })}
+                onChange={(body) => setEditTemp((prev) => ({ ...prev, body }))}
+                resetKey={editingId || editMode}
               />
             </div>
 
@@ -784,13 +787,10 @@ export default function TemplatesPage() {
 
             <div>
               <label className="block text-slate-700 mb-1">Email Body Content</label>
-              <textarea 
-                required
-                rows={5}
-                className="w-full border border-slate-200 bg-background rounded-md p-2 outline-hidden font-normal text-slate-800"
-                placeholder="Write your email body copy here. Direct links will automatically be attached to primary action buttons."
+              <VisualTemplateEditor
                 value={newTemp.body}
-                onChange={(e) => setNewTemp({ ...newTemp, body: e.target.value })}
+                onChange={(body) => setNewTemp((prev) => ({ ...prev, body }))}
+                resetKey={createEditorKey}
               />
             </div>
 
