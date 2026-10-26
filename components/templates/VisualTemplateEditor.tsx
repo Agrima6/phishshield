@@ -24,7 +24,7 @@ interface Props {
   /** Bump this (e.g. the template id, or a counter) to force the editor to
    * reload a different document - switching templates without unmounting
    * the whole dialog around it. */
-  resetKey?: string | number;
+  resetKey?: string | number | null;
   height?: number;
 }
 

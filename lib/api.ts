@@ -35,6 +35,42 @@ async function fetcher<T>(url: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/** Like fetcher(), but via XMLHttpRequest so upload progress can be
+ * reported - fetch() has no way to observe that for a request body, which
+ * matters for a file as large as a 50 MB campaign video. */
+export function uploadWithProgress<T>(
+  url: string,
+  formData: FormData,
+  onProgress?: (pct: number) => void,
+): { promise: Promise<T>; abort: () => void } {
+  const xhr = new XMLHttpRequest();
+  const promise = new Promise<T>((resolve, reject) => {
+    xhr.open('POST', url);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('phish_session_token') : null;
+    if (token) xhr.setRequestHeader('X-Admin-Key', token);
+    const activeTenant = typeof window !== 'undefined' ? localStorage.getItem('phish_tenant') : null;
+    if (activeTenant) xhr.setRequestHeader('X-Switch-Tenant', activeTenant);
+    xhr.withCredentials = true;
+
+    xhr.upload.onprogress = (e) => {
+      if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      let body: any = {};
+      try { body = JSON.parse(xhr.responseText); } catch { /* non-JSON error body, e.g. a proxy's own page */ }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(body as T);
+      } else {
+        reject(new Error(body.error || `HTTP error ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error during upload.'));
+    xhr.onabort = () => reject(new Error('Upload cancelled.'));
+    xhr.send(formData);
+  });
+  return { promise, abort: () => xhr.abort() };
+}
+
 // Map back and forth between backend JSON and frontend models
 export function mapBackendToTenantSettings(backend: any): TenantSettings {
   return {
@@ -596,6 +632,13 @@ export const api = {
 
   uploadImage: async (formData: FormData) => {
     return fetcher<{ url: string }>('/api/phish/upload/image', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  uploadVideo: async (formData: FormData) => {
+    return fetcher<{ url: string; size: number }>('/api/phish/upload/video', {
       method: 'POST',
       body: formData,
     });

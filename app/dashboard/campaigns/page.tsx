@@ -28,6 +28,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { api } from '@/lib/api';
 import { renderTemplateEmailHtml, templateHeaderImageUrl } from '@/lib/templateEmail';
 import { recipientDisplayStatus, recipientEnvironment } from '@/lib/tracking';
+import { TrainingResourceField } from '@/components/campaigns/TrainingResourceField';
+import { VisualTemplateEditor } from '@/components/templates/VisualTemplateEditor';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1183,16 +1185,11 @@ export default function CampaignsPage() {
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Training video / resource link <span className="text-slate-400 font-normal">(optional)</span></label>
-                <Input
-                  placeholder="https://youtube.com/watch?v=…  or any training page URL"
+                <label className="block text-slate-700 mb-1">Training video / resource <span className="text-slate-400 font-normal">(optional)</span></label>
+                <TrainingResourceField
                   value={newCampaign.trainingUrl}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, trainingUrl: e.target.value })}
+                  onChange={(trainingUrl) => setNewCampaign((prev) => ({ ...prev, trainingUrl }))}
                 />
-                <p className="text-[10px] text-slate-400 font-normal mt-1.5 leading-relaxed">
-                  Shown on the &quot;you&apos;ve been phished&quot; awareness page after the recipient submits the form.
-                  A YouTube link embeds as a video; any other link shows as a button.
-                </p>
               </div>
             </div>
           )}
@@ -1391,16 +1388,19 @@ export default function CampaignsPage() {
                 <Input value={editDraft.redirectUrl} onChange={(e) => setEditDraft({ ...editDraft, redirectUrl: e.target.value })} />
               </div>
               <div>
-                <label className="block text-slate-700 mb-1">Training video / resource link</label>
-                <Input value={editDraft.trainingUrl} onChange={(e) => setEditDraft({ ...editDraft, trainingUrl: e.target.value })} />
+                <label className="block text-slate-700 mb-1">Training video / resource</label>
+                <TrainingResourceField
+                  value={editDraft.trainingUrl}
+                  onChange={(trainingUrl) => setEditDraft((prev) => ({ ...prev, trainingUrl }))}
+                />
               </div>
               <div>
-                <label className="block text-slate-700 mb-1">Email body (HTML)</label>
-                <textarea
+                <label className="block text-slate-700 mb-1">Email Body Content</label>
+                <VisualTemplateEditor
                   value={editDraft.bodyHtml}
-                  onChange={(e) => setEditDraft({ ...editDraft, bodyHtml: e.target.value })}
-                  spellCheck={false}
-                  className="w-full h-48 rounded-md border border-slate-200 p-2 font-mono text-[11px] leading-relaxed text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  onChange={(bodyHtml) => setEditDraft((prev) => ({ ...prev, bodyHtml }))}
+                  resetKey={editDraftId}
+                  height={300}
                 />
               </div>
             </div>
